@@ -301,7 +301,7 @@ if __name__ == "__main__":
     render_img(expand(pat))
     plt.savefig("imgs/gun30_0.png", bbox_inches="tight")
     render_img(expand(advance(centre(centre(pat)), 30)))
-    plt.savefig("imgs/gun120_30.png", bbox_inches="tight")
+    plt.savefig("imgs/gun30_30.png", bbox_inches="tight")
 
     render_img(expand(advance(centre(centre(pat)), 120), level=0))
     plt.savefig("imgs/gun30_120_0.png", bbox_inches="tight")
