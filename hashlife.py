@@ -2,21 +2,25 @@ from collections import namedtuple
 from functools import lru_cache
 from collections import Counter
 
-def baseline_life(pts):    
+
+def baseline_life(pts):
     """The baseline implementation of the Game of Life. Takes a list/set 
     of (x,y) on cells, and returns a new set of on cells in the next
     generation"""
-    ns = Counter([(x+a, y+b) for x,y in pts for a in [-1,0,1] for b in [-1,0,1]])
-    return Counter([p for p in ns if ns[p]==3 or (ns[p]==4 and p in pts)])
+    ns = Counter(
+        [(x + a, y + b) for x, y in pts for a in [-1, 0, 1] for b in [-1, 0, 1]]
+    )
+    return Counter([p for p in ns if ns[p] == 3 or (ns[p] == 4 and p in pts)])
 
 
 # The base quadtree node
 # `k` is the level of the node
 # `a, b, c, d` are the children of this node (or None, if `k=0`).
-# `n` is the number of on cells in this node (useful for bookkeeping and display) 
-# `hash` is a precomputed hash of this node 
-# (if we don't do this, Python will recursively compute the hash every time it is needed!) 
+# `n` is the number of on cells in this node (useful for bookkeeping and display)
+# `hash` is a precomputed hash of this node
+# (if we don't do this, Python will recursively compute the hash every time it is needed!)
 _Node = namedtuple("Node", ["k", "a", "b", "c", "d", "n", "hash"])
+
 
 class Node(_Node):
     def __hash__(self):
@@ -31,6 +35,7 @@ on = Node(0, None, None, None, None, 1, 1)
 off = Node(0, None, None, None, None, 0, 0)
 
 mask = (1 << 63) - 1
+
 
 @lru_cache(maxsize=2 ** 24)
 def join(a, b, c, d):
@@ -295,6 +300,7 @@ if __name__ == "__main__":
 
     from render import render_img
     import matplotlib.pyplot as plt
+
     ## test the Gosper glider gun
     pat = load_lif("lifep/gun30.LIF")
     pat = load_lif("lifep/gun30.lif")
