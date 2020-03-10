@@ -1,8 +1,22 @@
 from collections import namedtuple
 from functools import lru_cache
+from collections import Counter
 
+def baseline_life(pts):    
+    """The baseline implementation of the Game of Life. Takes a list/set 
+    of (x,y) on cells, and returns a new set of on cells in the next
+    generation"""
+    ns = Counter([(x+a, y+b) for x,y in pts for a in [-1,0,1] for b in [-1,0,1]])
+    return Counter([p for p in ns if ns[p]==3 or (ns[p]==4 and p in pts)])
+
+
+# The base quadtree node
+# `k` is the level of the node
+# `a, b, c, d` are the children of this node (or None, if `k=0`).
+# `n` is the number of on cells in this node (useful for bookkeeping and display) 
+# `hash` is a precomputed hash of this node 
+# (if we don't do this, Python will recursively compute the hash every time it is needed!) 
 _Node = namedtuple("Node", ["k", "a", "b", "c", "d", "n", "hash"])
-
 
 class Node(_Node):
     def __hash__(self):
@@ -20,6 +34,11 @@ mask = (1 << 63) - 1
 
 @lru_cache(maxsize=2 ** 24)
 def join(a, b, c, d):
+    """
+    Combine four children at level `k-1` to a new node at level `k`.
+    If this is cached, return the cached node. 
+    Otherwise, create a new node, and add it to the cache.
+    """
     n = a.n + b.n + c.n + d.n
     nhash = (
         a.k
@@ -34,6 +53,7 @@ def join(a, b, c, d):
 
 @lru_cache(maxsize=1024)
 def get_zero(k):
+    """Return an empty node at level `k`."""
     if k > 0:
         return join(get_zero(k - 1), get_zero(k - 1), get_zero(k - 1), get_zero(k - 1))
     else:
@@ -41,6 +61,7 @@ def get_zero(k):
 
 
 def centre(m):
+    """Return a node at level `k+1`, which is centered on the given quadtree node."""
     z = get_zero(m.a.k)  # get the right-sized zero node
     return join(
         join(z, z, z, m.a), join(z, z, m.b, z), join(z, m.c, z, z), join(m.d, z, z, z)
@@ -48,11 +69,20 @@ def centre(m):
 
 
 def life(a, b, c, d, E, f, g, h, i):
+    """The standard life rule, taking eight neighbours and a centre cell E.
+    Returns on if should be on, and off otherwise."""
     outer = sum([t.n for t in [a, b, c, d, f, g, h, i]])
     return on if (E.n and outer == 2) or outer == 3 else off
 
 
 def life_4x4(m):
+    """
+    Return the next generation of a $k=2$ (i.e. 4x4) cell. 
+    To terminate the recursion, at the base level, 
+    if we have a $k=2$ 4x4 block, 
+    we can compute the 2x2 central successor by iterating over all 
+    the 3x3 sub-neighbourhoods of 1x1 cells using the standard Life rule.
+    """
     na = life(m.a.a, m.a.b, m.b.a, m.a.c, m.a.d, m.b.c, m.c.a, m.c.b, m.d.a)  # AD
     nb = life(m.a.b, m.b.a, m.b.b, m.a.d, m.b.c, m.b.d, m.c.b, m.d.a, m.d.b)  # BC
     nc = life(m.a.c, m.a.d, m.b.c, m.c.a, m.c.b, m.d.a, m.c.c, m.c.d, m.d.c)  # CB
@@ -62,7 +92,10 @@ def life_4x4(m):
 
 @lru_cache(maxsize=2 ** 24)
 def successor(m, j=None):
-    """Return the 2**k-1 x 2**k-1 successor, 2**j generations in the future"""
+    """
+    Return the 2**k-1 x 2**k-1 successor, 2**j generations in the future, 
+    where j <= k - 2, caching the result.
+    """
     if m.n == 0:  # empty
         return m.a
     elif m.k == 2:  # base case
@@ -97,7 +130,10 @@ def successor(m, j=None):
 
 
 def construct(pts):
-    """Turn a list of (x,y) coordinates into a quadtree"""
+    """
+    Turn a list of (x,y) coordinates into a quadtree
+    and return the top-level Node.
+    """
     # Force start at (0,0)
     min_x = min(*[x for x, y in pts])
     min_y = min(*[y for x, y in pts])
@@ -127,7 +163,8 @@ def expand(node, x=0, y=0, clip=None, level=0):
     """Turn a quadtree a list of (x,y,gray) triples 
     in the rectangle (x,y) -> (clip[0], clip[1]) (if clip is not-None).    
     If `level` is given, quadtree elements at the given level are given 
-    as a grayscale level 0.0->1.0,  "zooming out" the display."""
+    as a grayscale level 0.0->1.0,  "zooming out" the display.
+    """
 
     if node.n == 0:  # quick zero check
         return []
@@ -151,7 +188,11 @@ def expand(node, x=0, y=0, clip=None, level=0):
         )
 
 
-def print_points(points):
+def print_node(node):
+    """
+    Print out a node, fully expanded    
+    """
+    points = expand(crop(node))
     px, py = 0, 0
     for x, y, gray in sorted(points, key=lambda x: (x[1], x[0])):
         while y > py:
@@ -165,6 +206,10 @@ def print_points(points):
 
 
 def is_padded(node):
+    """
+    True if the pattern is surrounded by at least one sub-sub-block of
+    empty space.
+    """
     return (
         node.a.n == node.a.d.d.n
         and node.b.n == node.b.c.c.n
@@ -174,10 +219,17 @@ def is_padded(node):
 
 
 def inner(node):
+    """
+    Return the central portion of a node -- the inverse operation
+    of centre()
+    """
     return join(node.a.d, node.b.c, node.c.b, node.d.a)
 
 
 def crop(node):
+    """
+    Repeatedly take the inner node, until all padding is removed.
+    """
     if node.k <= 3 or not is_padded(node):
         return node
     else:
@@ -185,6 +237,9 @@ def crop(node):
 
 
 def pad(node):
+    """
+    Repeatedly centre a node, until it is fully padded.
+    """
     if node.k <= 3 or not is_padded(node):
         return pad(centre(node))
     else:
@@ -192,6 +247,8 @@ def pad(node):
 
 
 def ffwd(node, n):
+    """Advance as quickly as possible, taking n 
+    giant leaps"""
     gens = 0
     for i in range(n):
         node = pad(node)
@@ -201,13 +258,18 @@ def ffwd(node, n):
 
 
 def advance(node, n):
+    """Advance node by exactly n generations, using
+    the binary expansion of n to find the correct successors"""
     if n == 0:
         return node
     bits = []
+    # get the binary expansion, and pad sufficiently
     while n > 0:
         bits.append(n & 1)
         n = n >> 1
         node = centre(node)
+
+    # apply the successor rule
     for k, bit in enumerate(reversed(bits)):
         j = len(bits) - k - 1
         if bit:
@@ -231,23 +293,7 @@ if __name__ == "__main__":
     print(successor.cache_info())
     print(join.cache_info())
 
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    ## utility to show a point collection as an image in Matplotlib
-    def render_img(pts):
-        pts = np.array(pts)
-        pts[:, 0] -= np.min(pts[:, 0])
-        pts[:, 1] -= np.min(pts[:, 1])
-        grays = np.zeros((int(np.max(pts[:, 1] + 1)), int(np.max(pts[:, 0] + 1))))
-
-        for x, y, g in pts:
-            grays[int(y), int(x)] = g
-
-        plt.figure(figsize=(20, 20))
-        plt.imshow(grays, cmap="bone")
-        plt.axis("off")
-
+    from render import render_img
     ## test the Gosper glider gun
     pat = load_lif("lifep/gun30.LIF")
     pat = load_lif("lifep/gun30.lif")
@@ -264,4 +310,3 @@ if __name__ == "__main__":
     plt.savefig("imgs/gun30_120_2.png", bbox_inches="tight")
     render_img(expand(advance(centre(centre(pat)), 120), level=3))
     plt.savefig("imgs/gun30_120_3.png", bbox_inches="tight")
-

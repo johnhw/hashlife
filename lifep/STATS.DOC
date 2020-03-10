@@ -1,0 +1,56 @@
+
+The 50 most common Life objects and their frequencies.
+These are experimental results by Achim Flammenkamp.
+
+rank name                  1/frequency 
+====-----------------------===========
+   1 blinker                      3.03
+   2 block                        3.15
+   3 beehive                      5.24
+   4 loaf                        16.13
+   5 boat ______________________ 18.26
+   6 tub                         79.9
+   7 pond                        86.7
+   8 ship                       147.5
+   9 long boat                  273
+  10 glider ___________________ 357
+  11 toad                       395
+  12 shiptie                    702
+  13 barge                     1125
+  14 beacon                    1199
+  15 bi-loaf _________________ 1680
+  16 mango                     2862
+  17 eater                     5223
+  18 long barge                8092
+  19 aircraft carrier         11289
+  20 pulsar _________________ 15411
+  21 paperclip                18414
+  22 long ship                22029
+  23 shillelagh               28752
+  24 snake                    34269
+  25 big S __________________ 39106
+  26 boat on boat             40533
+  27 pond on pond             45710
+  28 integral sign            50233
+  29 trans-boat with tail     78412
+  30 hat ____________________ 83870
+  31 lightweight spaceship    91171
+  32 ship on boat            107659
+  33 very long boat          114499
+  34 tub with tail           124941
+  35 table on table ________ 155666
+  36 very long ship          168234
+  37 sinking ship            202871
+  38 double wing             322631
+  39 cis-mirrored R-bee      341350
+  40 block on table ________ 353412
+  41 block and dock          371805
+  42 twinhat                 403288
+  43 middleweight spaceship  437705
+  44 beehive with tail       574802
+  45 beehive and dock ______ 606155
+  46 loop                    647350
+  47 scorpion                749180
+  48 fourteener              803340
+  49 dead spark coil         881200
+  50 cis-boat with tail ___ 1036400

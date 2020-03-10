@@ -1,0 +1,153 @@
+
+You may wish to refer to this document if you are writing a Life
+program that reads the patterns in this collection.
+
+
+Niggly Technical Details of the .LIF file format:
+-------------------------------------------------
+
+The first line of a .LIF file always identifies the kind of format
+it uses, for compatibility purposes.  The standard is:
+
+#Life 1.05
+
+where 1.05 is the current format version number.  A lower number is
+acceptable, and a higher number means that something may be outside
+these specifications.  1.05 is the latest.
+
+The "#Life" line is followed by optional description lines, which
+begin with "#D" and are followed by no more than 78 characters of
+text.  Leading and trailing spaces are ignored, so the following two
+"#D" lines are equivalent:
+
+#D This is a Description line
+#D    This is a Description line   
+
+There should be no more than 22 "#D" lines in a .LIF file.
+
+Next comes an optional rule specification.  If no rules are
+specified, then the pattern will run with whatever rules the Life
+program is currently set to.  The patterns in the collection here
+enforce "Normal" Conway rules using the "#N" specifier.  Alternate
+rules use "#R" ("#N" is exactly the same as "#R 23/3").
+
+Rules are encoded as Survival/Birth, each list being a string of
+digits representing neighbor counts.  Since there are exactly eight
+possible neighbors in a Conway-like rule, there is no need to
+separate the digits, and "9" is prohibited in both lists.
+
+For example,
+
+#R 125/36
+
+means that the pattern should be run in a universe where 1, 2, or 5
+neighbors are necessary for a cell's survival, and 3 or 6 neighbors
+allows a cell to come alive.
+
+Next come the cell blocks.  Each cell block begins with a "#P" line,
+followed by "x y" coordinates of the upper-left hand corner of the
+block, assuming that 0 0 is the center of the current window to the
+Life universe.
+
+This is followed by lines that draw out the pattern in a visual way,
+using the "." and "*" characters (off, on).  Each line must be
+between 1 and 80 characters wide, inclusive; therefore, a blank line
+is represented by a single dot, whereas any other line may truncate
+all dots to the right of the last "*".  There is no limit to the
+number of lines in a cell block.
+
+Any line of zero length (just another carriage return) is completely
+ignored.  Carriage returns are MSDOS-style (both 10 and 13).
+
+About Xlife compatibility:
+--------------------------
+Xlife recognizes the symbol "#C" for a comment, instead of "#D".
+The default extension is ".life" instead of ".LIF".  Wlife (a port
+of Xlife for Microsoft Windows) does not have these compatibility
+problems.
+
+--------------------------------------------------------------------
+
+Notes on Life algorithm optimization:
+-------------------------------------
+I always think of CA optimization as being closely related to data
+compression.  This is also a simple concept with no simple solution.
+What solutions are best depends on the type of data being processed.
+In Conway's Life, patterns tend to be blobby.
+
+Sparse matrix techniques: I rejected them, because you aren't
+guaranteed many lines in the active region with nothing in them, and
+even worse, the lines that have something in them aren't guaranteed
+to have much in them.  Life isn't so much sparse, as it is blobby.
+
+For blobby universes, one should probably consider dividing the
+universe up into blocks approximately the size of the blobs.  For
+Life, 4x4 to 8x8 seem reasonable.  I chose my estimated upper bound,
+8x8, for reasons of convenience: There happen to be 8 bits in a
+byte.  I strongly considered 4x4, but it didn't work out as nice....
+
+You should put the blocks in some kind of list, so that you waste
+zero time in the empty parts of the universe.
+
+Already, note a complication: New elements in the list must be
+introduced if the pattern grows over a block's boundaries, but we
+have to know if the block's neighbor already exists.  You can either
+do a simple linear search of the list (ouch!), or binary search
+(yikes!), or keep some kind of map.  I chose to make a hash table,
+64 blocks by 64 blocks (512 cells x 512 cells).  This is solely used
+for finding the neighbors of a NEW block; each block already keeps a
+pointer to its N-S-E-W neighbors, as they will be referenced often.
+
+There must also be an efficient algorithm WITHIN the blocks.  I
+chose to primarily blaze straight thru each block, 4 cells at a time
+using a lookup table in one loop, and 8 cells at a time in the other
+loop.  There is some checking for blank lines, but other than that,
+there are no internal jumps until all 64 cells in a block are
+processed.  One of the tables is 64K in length; it was worth the
+expense.  In summary: All inner loops are "unrolled", and
+fast-lookup tables are employed.
+
+Note: CA programs typically consist of 2 main loops (plus a display
+loop), because CA rules operate on the cells in parallel, while the
+microprocessor is mostly serial.  This means that there must be two
+copies of the universe, effectively, so that no important info is
+destroyed in the process of creating the next generation.  Often
+these 2 copies are not symmetrical.  It was a great struggle for me,
+since almost every time I took something out of one loop to make it
+faster, I had to add something else to the other loop!  ALMOST every
+time, that is; the exceptions to that rule lead to the best
+optimizations!  In particular, there are good tradeoffs to be
+considered in bit-manipulations: shifting, masking, recombining to
+form an address in the lookup table....
+
+It can also be considered that sometimes the contents of a block may
+stabilize, requiring no further processing.  You could take the
+block out of the list, putting it in a "hibernation" state, only to
+be re-activated if a neighboring block has some activity spilling
+into it.  These blocks would take zero processing time, just like a
+blank region of the universe.
+
+Period-2 oscillators might also not be very difficult to detect, and
+remove from the processing time.  This might be worthwhile in Life,
+because the blinker is the most common kind of random debris.
+Higher period oscillators are much more rare.  It is also possible
+that gliders could be detected and simulated.  You will get
+diminishing returns from this kind of optimization, unless you take
+it to an extreme (cf. HashLife).
+
+Also, the "morgue" state: A block that does become completely empty
+might not be worth deallocating and removing from the hash table for
+a while.  That takes some processing time, which could be
+significant in the case of an oscillator moving in and out of its
+space repeatedly.  Only when memory gets low should the oldest
+blocks from the "morgue" list be recycled.
+
+When the program is fast enough, it should be considered that it
+isn't worth displaying generations any faster than the eye can see,
+or at least not much faster than the refresh rate of the monitor.
+Especially in windowed environments, display time can be a real
+bottleneck.
+
+OK, now that I've given more advice than I took myself, you can go
+and write a Life program faster than mine....
+
