@@ -156,7 +156,7 @@ def construct(pts):
         # merge at the next level
         pattern = next_level
         k += 1
-    return pattern.popitem()[1]
+    return pad(pattern.popitem()[1])
 
 
 def expand(node, x=0, y=0, clip=None, level=0):
