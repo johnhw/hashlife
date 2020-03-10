@@ -294,6 +294,7 @@ if __name__ == "__main__":
     print(join.cache_info())
 
     from render import render_img
+    import matplotlib.pyplot as plt
     ## test the Gosper glider gun
     pat = load_lif("lifep/gun30.LIF")
     pat = load_lif("lifep/gun30.lif")
