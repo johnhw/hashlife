@@ -1,11 +1,12 @@
-![ ](imgs/header.png)
+![ ](imgs/header.png width="50%")
 
 Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](johnhw.github.io/hashlife) for a full explanation.
 
 Usage:
 
 ```python
-from hashlife import construct, advance, node_30
+from hashlife import construct, advance, expand
+from lifeparsers import autoguess_life_file
 from render import render_img
 
 pat, _ = autoguess_life_file("lifep/gun30.lif")
@@ -16,5 +17,7 @@ render_img(pts)
 ```
 
 <img src="imgs/gun30_30.png">
+
+## Credits
 
 Life patterns in `lifep/` collected by Alan Hensel.
