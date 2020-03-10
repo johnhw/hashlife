@@ -18,6 +18,7 @@ from hashlife import (
 from lifeparsers import autoguess_life_file
 from itertools import product
 import os
+from functools import lru_cache
 
 
 def test_bootstrap():
@@ -143,6 +144,7 @@ def test_pad():
     assert not is_padded(node)
 
 
+@lru_cache(None)
 def validate_tree(node):
     if node.k > 0:
         assert node.n >= 0 and node.n <= 2 ** (node.k * 2)
