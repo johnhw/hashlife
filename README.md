@@ -1,6 +1,6 @@
 <img src="imgs/header.png" width="50%">
 
-Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](johnhw.github.io/hashlife) for a full explanation.
+Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](https://johnhw.github.io/hashlife) for a full explanation.
 
 Usage:
 
