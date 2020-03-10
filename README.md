@@ -1,4 +1,4 @@
-![ ](imgs/header.png width="50%")
+<img src="imgs/header.png" width="50%">
 
 Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](johnhw.github.io/hashlife) for a full explanation.
 
