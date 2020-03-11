@@ -21,23 +21,26 @@ def baseline_life(pts):
 # `n` is the number of on cells in this node (useful for bookkeeping and display)
 # `hash` is a precomputed hash of this node
 # (if we don't do this, Python will recursively compute the hash every time it is needed!)
-_Node = namedtuple("Node", ["k", "a", "b", "c", "d", "n", "hash"])
+class Node:
+    __slots__ = ["k", "a", "b", "c", "d", "n", "hash"]
 
+    def __init__(self, k, n, hash, a=None, b=None, c=None, d=None):
+        self.k = k
+        self.n = n
+        self.a, self.b, self.c, self.d = a,b,c,d
+        self.hash = hash
 
-class Node(_Node):
     def __hash__(self):
         return self.hash
 
     def __repr__(self):
         return f"Node k={self.k}, {1<<self.k} x {1<<self.k}, population {self.n}"
 
-
 # base level binary nodes
-on = Node(0, None, None, None, None, 1, 1)
-off = Node(0, None, None, None, None, 0, 0)
+on = Node(k=0, n=1, hash=1)
+off = Node(k=0, n=0, hash=0)
 
 mask = (1 << 63) - 1
-
 
 @lru_cache(maxsize=2 ** 24)
 def join(a, b, c, d):
@@ -55,8 +58,8 @@ def join(a, b, c, d):
         + 8973110871315 * c.hash
         + 4318490180473 * d.hash
     ) & mask
-    return Node(a.k + 1, a, b, c, d, n, nhash)
-
+    return Node(a.k+1, n, nhash, a, b, c, d)
+    
 
 @lru_cache(maxsize=1024)
 def get_zero(k):
