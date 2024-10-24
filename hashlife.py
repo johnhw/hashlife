@@ -261,7 +261,7 @@ def ffwd(node, n):
     giant leaps"""
     gens = 0
     for i in range(n):
-        node = pad(node)
+        node = centre(centre(pad(node)))
         gens += 1 << (node.k - 2)
         node = successor(node)
     return node, gens
@@ -273,11 +273,12 @@ def advance(node, n):
     if n == 0:
         return node
     bits = []
+    
     # get the binary expansion, and pad sufficiently
     while n > 0:
         bits.append(n & 1)
-        n = n >> 1
-        node = centre(node)
+        n = n >> 1                
+        node = centre(centre(node))
 
     # apply the successor rule
     for k, bit in enumerate(reversed(bits)):

@@ -19,6 +19,8 @@ from lifeparsers import autoguess_life_file
 from itertools import product
 import os
 from functools import lru_cache
+from pathlib import Path
+import pytest 
 
 
 def test_bootstrap():
@@ -83,7 +85,27 @@ def verify_baseline(pat, n):
         advanced = advance(node, i)
         assert same_pattern(pat, expand(advanced))
         pat = baseline_life(pat)
+        
 
+
+
+def verify_baseline_step(pat, n):        
+    node = construct(pat)
+    assert same_pattern(pat, expand(node))
+    for i in range(n):
+        pat = baseline_life(pat)
+    node = advance(node, n)
+    print(len(pat),len(expand(node)))
+    assert same_pattern(pat, expand(node))
+    
+    
+
+def verify_ffwd(pat, leaps=8):
+    node = construct(pat)
+    node, n = ffwd(node, leaps)
+    for i in range(n):
+        pat = baseline_life(pat)
+    assert same_pattern(pat, expand(node))
 
 def test_gray():
     pat, _ = autoguess_life_file("lifep/breeder.lif")
@@ -94,6 +116,20 @@ def test_gray():
         gray_sum = sum([g for (x, y, g) in expansion])
         assert gray_sum == total_on / (2 ** (l * 2))
 
+
+
+@pytest.mark.slow
+def test_pats():
+    verify_baseline_step(autoguess_life_file("tests/fred.rle")[0], 65000)
+    verify_baseline_step(autoguess_life_file("lifep/breeder.lif")[0], 2000)
+    verify_baseline_step(autoguess_life_file("lifep/jaws.lif")[0], 2000)
+
+    for file in Path(".").glob("lifep/*.lif"):
+        verify_baseline_step(autoguess_life_file(file)[0], 20)
+    
+    verify_ffwd(autoguess_life_file("lifep/pi.lif")[0], 8)
+    verify_ffwd(autoguess_life_file("lifep/bi-gun.lif")[0], 3)
+    
 
 def verify_clipped(node, x1, y1, x2, y2):
     pts = expand(node, clip=(x1, y1, x2, y2))
