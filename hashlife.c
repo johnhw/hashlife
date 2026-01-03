@@ -273,45 +273,58 @@ node_id next(node_table *table, node_id id)
 
 /* Advance time by j steps.
     - Find the MSB of j
-    - Make sure that the node has a level at least big enough for the MSB of j + 2
-    - Repeatedly apply successor for each bit set in j (e.g. applying successor for 2^k-2 steps at level k, then moving to all nodes at level k-1, etc.)
+    - Make sure that the node has a level at least big enough
+    
 */
 node_id advance(node_table *table, node_id id, uint64_t j)
 {
-    if (j == 0)
-        return id;
-
-    node *n = lookup(table, id);
-
-    if (n->pop == 0)
-        return id;
-
     // find the position of the MSB of j
     uint64_t msb = 0;
     uint64_t temp = j;
     while (temp >>= 1)
         msb++;
-
+    node *n = lookup(table, id);
     // ensure the node is big enough
     while (n->level <= msb + 1)
     {
         id = centre(table, id);
         n = lookup(table, id);
     }
+    // pad once to the centre
+    id = centre(table, id);
+    n = lookup(table, id);
+    
+    // crop for the caller
+    return skip(table, id, j);
+}
 
-    node_id next_j = next(table, id);
-
-    // check if j is now zero after knocking out the MSB
-    j = j ^ (1ULL << msb);
+/* 
+    TODO: fix logic here; this isn't correct
+    Skip forward by j generations 
+   Node must be appropriated padded already.
+*/
+node_id skip(node_table *table, node_id id, uint64_t j)
+{
     if (j == 0)
-        return next_j;
-
-    // otherwise, advance the next node by the remaining j
-    return join(table,
-                advance(table, join(table, n->a, n->b, n->c, n->d), j),
-                advance(table, join(table, n->b, n->c, n->d, n->a), j),
-                advance(table, join(table, n->c, n->d, n->a, n->b), j),
-                advance(table, join(table, n->d, n->a, n->b, n->c), j));
+        return id;
+    node *n = lookup(table, id);
+    if(n->pop == 0)
+        return id; 
+    uint64_t msb = 0;
+    uint64_t temp = j;
+    while (temp >>= 1)
+        msb++;
+    // are we at the correct level?
+    if(n->level == msb + 2)
+    {
+        // keep going with the bit knocked out
+        return skip(table, next(table, id),  j ^ (1ULL << msb));
+    }
+    // go deeper
+    return join(table, skip(table, n->a, j),
+                      skip(table, n->b, j),
+                      skip(table, n->c, j),
+                      skip(table, n->d, j));
 }
 
 /* Compute the life rule on the 3x3 neighbourhood

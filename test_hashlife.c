@@ -328,7 +328,23 @@ void test_advance()
     to_text(table, succ, buf);
     succ = next(table, succ);
 
-    printf("Advanced pattern:\n%s\n", buf);
+    printf("Advanced pattern (next):\n%s\n", buf);
+
+
+    node_id next_1 = advance(table, mickey, 8);
+    to_text(table, next_1, buf);
+    printf("Advanced pattern (advance):\n%s\n", buf);
+
+    char *gosper_gun = "........................O\n......................O.O\n............OO......OO............OO\n...........O...O....OO............OO\nOO........O.....O...OO\nOO........O...O.OO....O.O\n..........O.....O.......O\n...........O...O\n............OO";
+    node_id gun = from_text(table, gosper_gun);
+    for(int i=0;i<30;i++)
+    {
+        node_id g = advance(table, gun, i);        
+        to_text(table, g, buf);
+        printf("Gun at step %d:\n%s\n", i, buf);
+    }
+
+
     TEST_OK("Pattern advancement verified");
 }
 
@@ -352,6 +368,8 @@ void test_pattern()
     printf("Cropped centred converted pattern:\n%s\n", buf);
     printf("Testing inner/center/pad/crop functions on pattern\n");
     test_inner(table, mickey);
+
+    
 
     TEST_OK("Pattern import/export verified");
 }
