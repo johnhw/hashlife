@@ -249,64 +249,84 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
     }
 }
 
-
-
-// node *successor(node_table *table, node *node, uint64_t j)
-// {
-//     if(node->pop==0)
-//         return node->a;
-//     else if(node->k==2)
-//         return life_4x4(table, node);
-//     else
-//     {
-//         j = node->k - 2 ? j : min(j, node->k - 2);
-//         node *c1 = successor(table, JOIN(node, a, a, a, b, a, c, a, d), j);
-//         node *c2 = successor(table, JOIN(node, a, b, b, a, a, d, b, c), j);
-//         node *c3 = successor(table, JOIN(node, b, a, b, b, b, c, b, d), j);
-//         node *c4 = successor(table, JOIN(node, a, c, a, d, c, a, c, b), j);
-//         node *c5 = successor(table, JOIN(node, a, d, b, c, c, b, d, a), j);
-//         node *c6 = successor(table, JOIN(node, b, c, b, d, d, a, d, b), j);
-//         node *c7 = successor(table, JOIN(node, c, a, c, b, c, c, c, d), j);
-//         node *c8 = successor(table, JOIN(node, c, b, d, a, c, d, d, c), j);
-//         node *c9 = successor(table, JOIN(node, d, a, d, b, d, c, d, d), j);
-//         if(j < node->k - 2)
-//         {
-//             return join_table(table,
-//                 join_table(table, get_table(table, c1->d), get_table(table, c2->c), get_table(table, c4->b), get_table(table, c5->a)),
-//                 join_table(table, get_table(table, c2->d), get_table(table, c3->c), get_table(table, c5->b), get_table(table, c6->a)),
-//                 join_table(table, get_table(table, c4->d), get_table(table, c5->c), get_table(table, c7->b), get_table(table, c8->a)),
-//                 join_table(table, get_table(table, c5->d), get_table(table, c6->c), get_table(table, c8->b), get_table(table, c9->a))
-                
-//             );
-//         }
-//         else
-//         {
-//             return join_table(table,
-//                 successor(table, join_table(table, c1, c2, c4, c5), j),
-//                 successor(table, join_table(table, c2, c3, c5, c6), j),
-//                 successor(table, join_table(table, c4, c5, c7, c8), j),
-//                 successor(table, join_table(table, c5, c6, c8, c9), j)
-//             );
-//         }
-        
-//     }
-// }
-
-
+/* Find the successor of the given node, 2^level-2 steps in the future */
 node_id successor(node_table *table, node_id id)
 {
     node *n = lookup(table, id);
+
+    node *c1, *c2, *c3, *c4, *c5, *c6, *c7, *c8, *c9;
     if (n->pop == 0)
         return n->a;
-    else if (n->level == 2)
-        return life_4x4(table, id);
-    else
-    {
-        node_id a = successor(table, join(table, n->a, n->b, n->c, n->d));
-        return a;
-    }
+    if (n->level == 2)
+        return n->next; // guaranteed to be cached
+    c1 = join(table, n->aa, n->ab, n->ac, n->ad);
+    c2 = join(table, n->ab, n->ba, n->ad, n->bc);
+    c3 = join(table, n->ba, n->bb, n->bc, n->bd);
+    c4 = join(table, n->ac, n->ad, n->ca, n->cb);
+    c5 = join(table, n->ad, n->bc, n->cb, n->da);
+    c6 = join(table, n->bc, n->bd, n->da, n->db);
+    c7 = join(table, n->ca, n->cb, n->cc, n->cd);
+    c8 = join(table, n->cb, n->da, n->cd, n->dc);
+    c9 = join(table, n->da, n->db, n->dc, n->dd);
+    return join(table,
+                successor(table, join(table, c1, c2, c4, c5)),
+                successor(table, join(table, c2, c3, c5, c6)),
+                successor(table, join(table, c4, c5, c7, c8)),
+                successor(table, join(table, c5, c6, c8, c9)));
 }
 
+/* Return the successor for this node, caching it as required */
+node_id next(node_table *table, node_id id)
+{
+    node *n = lookup(table, id);
+    if (n->next)
+        return n->next;
+    n->next = successor(table, id);
+    return n->next;
+}
+
+/* Advance time by j steps.
+    - Find the MSB of j
+    - Make sure that the node has a level at least big enough for the MSB of j + 2
+    - Repeatedly apply successor for each bit set in j (e.g. applying successor for 2^k-2 steps at level k, then moving to all nodes at level k-1, etc.)
+*/
+node_id advance(node_table *table, node_id id, uint64_t j)
+{
+    if (j == 0)
+        return id;
+
+    node *n = lookup(table, id);
+
+    if (n->pop == 0)
+        return id;
+
+    // find the position of the MSB of j
+    uint64_t msb = 0;
+    uint64_t temp = j;
+    while (temp >>= 1)
+        msb++;
+
+    // ensure the node is big enough
+    while (n->level <= msb + 1)
+    {
+        id = centre(table, id);
+        n = lookup(table, id);
+    }
+
+    node_id next_j = next(table, id);
+
+    // check if j is now zero after knocking out the MSB
+    j = j ^ (1ULL << msb);
+    if (j == 0)
+        return next_j;
+
+    // otherwise, advance the next node by the remaining j
+    return join(table,
+                advance(table, join(table, n->a, n->b, n->c, n->d), j),
+                advance(table, join(table, n->b, n->c, n->d, n->a), j),
+                advance(table, join(table, n->c, n->d, n->a, n->b), j),
+                advance(table, join(table, n->d, n->a, n->b, n->c), j));
+}
 
 /* Compute the life rule on the 3x3 neighbourhood
 
@@ -326,7 +346,7 @@ node *base_life(node_table *table, node_id a, node_id b, node_id c, node_id d, n
 
 node_id *life_4x4(node_table *table, node_id m_h)
 {
-    node *m = get_table(table, m_h);
+    node *m = lookup(table, m_h);
     // k = 2
     node_id na, nb, nc, nd;
     na = base_life(table, m->aa, m->ab, m->ba, m->ac, m->ad, m->bc, m->ca, m->cb, m->da);
@@ -431,6 +451,7 @@ node_id pad(node_table *table, node_id id)
 node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool state)
 {
     node *n = lookup(table, id);
+
     if (n->level == 0)
     {
         if (state)
@@ -438,6 +459,14 @@ node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool sta
         else
             return table->off->id;
     }
+
+    // expand the node until x < 1<< (level-1) and y < 1 << (level-1)
+    while (x >= (1ULL << n->level) || y >= (1ULL << n->level))
+    {
+        id = centre(table, id);
+        n = lookup(table, id);
+    }
+
     uint64_t offset = 1 << (n->level - 1);
     node_id a = n->a;
     node_id b = n->b;
@@ -460,6 +489,11 @@ float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, int level)
     node *n = lookup(table, id);
     if (n->level == 0 || n->level == level)
         return n->pop / (float)(1 << (n->level * 2));
+    uint64_t size = 1 << n->level;
+    // bounds test
+    if (x < 0 || y < 0 || x >= size || y >= size)
+        return 0.0f;
+    // recursive descent
     uint64_t offset = 1 << (n->level - 1);
     if (x < offset && y < offset)
         return get_cell(table, n->a, x, y, level);
@@ -482,4 +516,133 @@ void rasterise(node_table *table, node_id id, float *buf, uint64_t buf_width, ui
     for (uint64_t j = 0; j < pixel_height; j++)
         for (uint64_t i = 0; i < pixel_width; i++)
             buf[j * buf_width + i] = get_cell(table, id, x + (i << min_level), y + (j << min_level), min_level);
+}
+
+/* Return true if the character is valid RLE */
+bool is_tok(char ch)
+{
+    return ch == 'b' || ch == 'o' || ch == '$' || ch == '!' || isdigit(ch);
+}
+
+/* Read a single RLE element from a stream, skipping irrelevant material */
+char *read_one(char *s, char *state, int *count)
+{
+    int n = 0;
+    while (*s)
+    {
+        while (*s && isspace((unsigned char)*s))
+            s++;
+        if (!*s || is_tok(*s))
+            break;
+
+        while (*s && *s != '\n')
+            s++;
+        if (*s == '\n')
+            s++;
+    }
+
+    if (!*s)
+    {
+        *state = '!';
+        *count = 1;
+        return s;
+    }
+
+    while (isdigit((unsigned char)*s))
+        n = n * 10 + (*s++ - '0');
+
+    *count = n ? n : 1;
+    *state = *s++;
+    return s;
+}
+
+/*
+    Take an RLE string, ignore any size or comment information
+    and insert the live cells into a hashlife node table, returning the root node_id
+*/
+node_id from_rle(node_table *table, char *rle_str)
+{
+    char *s = rle_str;
+    char state;
+    int count;
+    uint64_t x = 0, y = 0;
+    node_id root = table->off->id;
+
+    while (1)
+    {
+        s = read_one(s, &state, &count);
+        if (state == '!' || !state)
+            break;
+        else if (state == 'b')
+        {
+            x += count;
+        }
+        else if (state == 'o')
+        {
+            for (int i = 0; i < count; i++)
+            {
+                root = set_cell(table, root, x, y, true);
+                x++;
+            }
+        }
+        else if (state == '$')
+        {
+            y += count;
+            x = 0;
+        }
+    }
+    return root;
+}
+
+/*
+    Take a hashlife node and output an RLE string into the given buffer.
+    The buffer must be large enough to hold the output.
+*/
+void to_rle(node_table *table, node_id id, char *buf)
+{
+    char *p = buf;
+    uint64_t size = 1ULL << lookup(table, id)->level;
+    uint64_t count;
+    p += sprintf(p, "x=%llu,y=%llu, rule = B3/S23\n", size, size);
+
+    float cell_value;
+    for (uint64_t y = 0; y < size; y++)
+    {
+        count = 0;
+        cell_value = -1.0f; // invalid
+        for (uint64_t x = 0; x < size; x++)
+        {
+            float v = get_cell(table, id, x, y, 0);
+            if (v == cell_value)
+            {
+                count++;
+            }
+            else
+            {
+                // flush previous
+                if (cell_value >= 0.0f)
+                {
+                    if (count > 1)
+                        p += sprintf(p, "%d%c", (int)count, cell_value > 0.5f ? 'o' : 'b');
+                    else
+                        p += sprintf(p, "%c", cell_value > 0.5f ? 'o' : 'b');
+                }
+                // start new
+                cell_value = v;
+                count = 1;
+            }
+        }
+        // flush end of line
+        if (cell_value >= 0.0f)
+        {
+            if (count > 1)
+                p += sprintf(p, "%d%c", (int)count, cell_value > 0.5f ? 'o' : 'b');
+            else
+                p += sprintf(p, "%c", cell_value > 0.5f ? 'o' : 'b');
+        }
+        // line end
+        p += sprintf(p, "$");
+    }
+    // end marker
+    sprintf(p, "!");
 }
