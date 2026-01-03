@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -g -Wall
-TARGET = test_hashlife
-OBJS = test_hashlife.o hashlife.o coords.o
+TARGET = test_alt_hashlife
+OBJS = test_alt_hashlife.o alt_hashlife.o
 
 .PHONY: all clean
 
@@ -10,14 +10,11 @@ test: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-test_hashlife.o: test_hashlife.c
-	$(CC) $(CFLAGS) -c test_hashlife.c
+test_hashlife.o: test_alt_hashlife.c
+	$(CC) $(CFLAGS) -c test_alt_hashlife.c
 
-hashlife.o: hashlife.c
-	$(CC) $(CFLAGS) -c hashlife.c
-
-coords.o: coords.c
-	$(CC) $(CFLAGS) -c coords.c
+hashlife.o: alt_hashlife.c
+	$(CC) $(CFLAGS) -c alt_hashlife.c
 
 clean:
 	rm -f $(TARGET) $(OBJS)
