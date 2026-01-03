@@ -1,4 +1,4 @@
-#include "alt_hashlife.h"
+#include "hashlife.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +13,7 @@
 
 void verify_hashtable(node_table *table)
 {
-    int entries = 0;
+    uint64_t entries = 0;
     TEST_START("Verifying hashtable");
     for (uint64_t i = 0; i < table->size; i++)
     {
@@ -119,9 +119,9 @@ void verify_children(node_table *table)
 uint64_t verify_tree(node_table *table, node_id id, uint64_t level)
 {
     node *n = lookup(table, id);
-    assert(n->pop >= 0 && n->pop <= (1ULL << (2 * n->level)));
+    assert(n->pop <= (1ULL << (2 * n->level)));
     assert(n->level == level);
-    assert(n->level >= 0);
+    
     assert(n != NULL);
     if (n->level == 0)
     {
@@ -199,8 +199,8 @@ void test_init()
     TEST_START("Testing table initialisation...");
     // force expansions
     node_table *table = create_table(131072);
-    printf("Table has %d entries\n", table->count);
-    printf("Table size: %d\n", table->size);
+    printf("Table has %llu entries\n", table->count);
+    printf("Table size: %llu\n", table->size);
     assert(table != NULL);
     printf("Table was not NULL\n");
     assert(lookup(table, table->on) != NULL);
@@ -220,7 +220,7 @@ void test_init()
         node *z = lookup(table, table->zeros[i]);
         assert(z != NULL);
         assert(z->pop == 0);
-        assert(z->level == i);
+        assert(z->level == (uint64_t)i);
     }
     printf("All zero nodes verified\n");
     verify_hashtable(table);
@@ -310,55 +310,6 @@ void test_set_get(node_table *table)
     TEST_OK("Set and Get cells verified");
 }
 
-/* Read a .* style plain text pattern
-    and return the corresponding hashlife node
-*/
-node_id from_text(node_table *table, char *txt)
-{
-    node_id root = table->zeros[1];
-    uint64_t x = 0, y = 0;
-    char *p = txt;
-    while (*p)
-    {
-        switch (*p++)
-        {
-            case 'O':
-                root = set_cell(table, root, x, y, 1);
-                x++;
-                break;
-            case '.':
-                x++;
-                break;
-            case '\n':
-                y++;
-                x = 0;
-                break;
-        }
-    }
-    return root;
-}
-
-/* Convert a hashlife node to a .* style plain text pattern
-    The buffer must be large enough to hold the output.
-*/
-void to_text(node_table *table, node_id id, char *buf)
-{
-    char *p = buf;
-    uint64_t size = 1ULL << lookup(table, id)->level;
-    for (uint64_t y = 0; y < size; y++)
-    {
-        for (uint64_t x = 0; x < size; x++)
-        {
-            float v = get_cell(table, id, x, y, 0);
-            *p++ = v>0.5f ? 'O' : '.';
-            
-        }
-        *p++ = '\n';        
-    }
-    *p++ = 0;
-}
-
-
 void test_advance()
 {
     TEST_START("Testing pattern advancement");
@@ -366,15 +317,17 @@ void test_advance()
     char *mickey_mouse = ".OO....OO\nO..O..O..O\nO..OOOO..O\n.OO....OO\n...OOOO\n...O..O\n....OO";
     node_id mickey = from_text(table, mickey_mouse);
     
-    mickey =  centre(table, centre(table, centre(table, mickey)));
+    mickey = centre(table, centre(table, mickey));
     verify_children(table);
     verify_tree(table, mickey, lookup(table, mickey)->level);
 
     print_node(table, mickey);
-    node_id succ = successor(table, mickey);
+    node_id succ = next(table, mickey);
     print_node(table, succ);
     char buf[1<<20];
     to_text(table, succ, buf);
+    succ = next(table, succ);
+
     printf("Advanced pattern:\n%s\n", buf);
     TEST_OK("Pattern advancement verified");
 }

@@ -8,7 +8,7 @@
     - Nodes are reference counted.
 
 */
-#include "alt_hashlife.h"
+#include "hashlife.h"
 
 uint64_t make_index(uint32_t generation, uint32_t index)
 {
@@ -57,7 +57,7 @@ node_id centre(node_table *table, node_id m_h)
 /* Return the zero node of the given size */
 node_id get_zero(node_table *table, uint64_t k)
 {
-    assert(k >= 0 && k < ZERO_CACHE_MAX_SIZE);
+    assert(k < ZERO_CACHE_MAX_SIZE);
     if (k < ZERO_CACHE_MAX_SIZE)
         return table->zeros[k];
     return 0; // assert will catch this case
@@ -200,7 +200,7 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
         uint64_t new_mask = new_size - 1;
         uint64_t new_index_pos;
         node *old_n;
-        for (int i = 0; i < table->size; i++)
+        for (uint64_t i = 0; i < table->size; i++)
         {
             old_n = &table->index[i];
             // perform re-insertion of all nodes
@@ -223,17 +223,18 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
 
 node_id sucjoin(node_table *table, node_id a, node_id b, node_id c, node_id d)
 {
-    return successor(table, join(table, a, b, c, d));    
+    return next(table, join(table, a, b, c, d));    
 }
 /* Find the successor of the given node, 2^level-2 steps in the future */
 node_id successor(node_table *table, node_id id)
 {
+    
     node *n = lookup(table, id);
     if (n->pop == 0)
         return n->a;
     if (n->level == 2)
-        return n->next; // guaranteed to be cached
-
+       return n->next; // guaranteed to be cached
+    
     // store the node locally to ensure it does not change during processing
     node ncopy;
     ncopy = *n;
@@ -262,10 +263,11 @@ node_id successor(node_table *table, node_id id)
 node_id next(node_table *table, node_id id)
 {
     node *n = lookup(table, id);
-    if (n->next)
-        return n->next;
-    n->next = successor(table, id);
-    incref(table, n->next);
+    if (!n->next)
+    {
+        n->next = successor(table, id);
+        incref(table, n->next);
+    }
     return n->next;
 }
 
@@ -320,11 +322,11 @@ node_id advance(node_table *table, node_id id, uint64_t j)
 
     Returns either the hash of the "on" (=2) or "off" (=1) base node.
 */
-node_id base_life(node_table *table, node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i)
+node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i)
 {
-    /* hash 1 = off, hash 2 = on, by definition*/
-    int pop_sum = (a - 1) + (b - 1) + (c - 1) + (d - 1) + (e - 1) + (f - 1) + (g - 1) + (h - 1) + (i - 1);
-    bool alive = (pop_sum == 3 || (pop_sum == 2 && e == 2));
+    /* hash 1 = off, hash 2 = on, by definition*/    
+    int pop_sum = (a - 1) + (b - 1) + (c - 1) + (d - 1) + (f - 1) + (g - 1) + (h - 1) + (i - 1);
+    bool alive = pop_sum == 3 || (pop_sum == 2 && e == 2);
     return alive + 1;
 }
 
@@ -333,12 +335,11 @@ node_id life_4x4(node_table *table, node_id m_h)
     node *m = lookup(table, m_h);
     // k = 2
     node_id na, nb, nc, nd;
-    na = base_life(table, m->aa, m->ab, m->ba, m->ac, m->ad, m->bc, m->ca, m->cb, m->da);
-    nb = base_life(table, m->ab, m->ba, m->bb, m->ad, m->bc, m->bd, m->cb, m->da, m->db);
-    nc = base_life(table, m->ac, m->ad, m->bc, m->ca, m->cb, m->da, m->cc, m->cd, m->dc);
-    nd = base_life(table, m->ad, m->bc, m->bd, m->cb, m->da, m->db, m->cd, m->dc, m->dd);
-    node_id new_node = join(table, na, nb, nc, nd);
-    return new_node;
+    na = base_life(m->aa, m->ab, m->ba, m->ac, m->ad, m->bc, m->ca, m->cb, m->da);
+    nb = base_life(m->ab, m->ba, m->bb, m->ad, m->bc, m->bd, m->cb, m->da, m->db);
+    nc = base_life(m->ac, m->ad, m->bc, m->ca, m->cb, m->da, m->cc, m->cd, m->dc);
+    nd = base_life(m->ad, m->bc, m->bd, m->cb, m->da, m->db, m->cd, m->dc, m->dd);
+    return join(table, na, nb, nc, nd);    
 }
 
 /* Initialise the zero cache and the on and off base nodes */
@@ -486,14 +487,14 @@ node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool sta
 }
 
 /* Get the grey level at the given position and level */
-float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, int level)
+float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, uint64_t level)
 {
     node *n = lookup(table, id);
     if (n->level == 0 || n->level == level)
         return n->pop / (float)(1 << (n->level * 2));
     uint64_t size = 1 << n->level;
     // bounds test
-    if (x < 0 || y < 0 || x >= size || y >= size)
+    if (x >= size || y >= size)
         return 0.0f;
     // recursive descent
     uint64_t offset = 1 << (n->level - 1);
@@ -505,146 +506,4 @@ float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, int level)
         return get_cell(table, n->c, x, y - offset, level);
     else
         return get_cell(table, n->d, x - offset, y - offset, level);
-}
-
-/* Rasterise to an image */
-void rasterise(node_table *table, node_id id, float *buf, uint64_t buf_width, uint64_t buf_height, uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t min_level)
-{
-    /* Verify that the size is compatible */
-    uint64_t pixel_width = width >> min_level;
-    uint64_t pixel_height = height >> min_level;
-    assert(pixel_width <= buf_width && pixel_height <= buf_height);
-
-    for (uint64_t j = 0; j < pixel_height; j++)
-        for (uint64_t i = 0; i < pixel_width; i++)
-            buf[j * buf_width + i] = get_cell(table, id, x + (i << min_level), y + (j << min_level), min_level);
-}
-
-/* Return true if the character is valid RLE */
-bool is_tok(char ch)
-{
-    return ch == 'b' || ch == 'o' || ch == '$' || ch == '!' || isdigit(ch);
-}
-
-/* Read a single RLE element from a stream, skipping irrelevant material */
-char *read_one(char *s, char *state, int *count)
-{
-    int n = 0;
-    while (*s)
-    {
-        while (*s && isspace((unsigned char)*s))
-            s++;
-        if (!*s || is_tok(*s))
-            break;
-
-        while (*s && *s != '\n')
-            s++;
-        if (*s == '\n')
-            s++;
-    }
-
-    if (!*s)
-    {
-        *state = '!';
-        *count = 1;
-        return s;
-    }
-
-    while (isdigit((unsigned char)*s))
-        n = n * 10 + (*s++ - '0');
-
-    *count = n ? n : 1;
-    *state = *s++;
-    return s;
-}
-
-/*
-    Take an RLE string, ignore any size or comment information
-    and insert the live cells into a hashlife node table, returning the root node_id
-*/
-node_id from_rle(node_table *table, char *rle_str)
-{
-    char *s = rle_str;
-    char state;
-    int count;
-    uint64_t x = 0, y = 0;
-    node_id root = table->off;
-
-    while (1)
-    {
-        s = read_one(s, &state, &count);
-        if (state == '!' || !state)
-            break;
-        else if (state == 'b')
-        {
-            x += count;
-        }
-        else if (state == 'o')
-        {
-            for (int i = 0; i < count; i++)
-            {
-                root = set_cell(table, root, x, y, true);
-                x++;
-            }
-        }
-        else if (state == '$')
-        {
-            y += count;
-            x = 0;
-        }
-    }
-    return root;
-}
-
-/*
-    Take a hashlife node and output an RLE string into the given buffer.
-    The buffer must be large enough to hold the output.
-*/
-void to_rle(node_table *table, node_id id, char *buf)
-{
-    char *p = buf;
-    uint64_t size = 1ULL << lookup(table, id)->level;
-    uint64_t count;
-    p += sprintf(p, "x=%llu,y=%llu, rule = B3/S23\n", size, size);
-
-    float cell_value;
-    for (uint64_t y = 0; y < size; y++)
-    {
-        count = 0;
-        cell_value = -1.0f; // invalid
-        for (uint64_t x = 0; x < size; x++)
-        {
-            float v = get_cell(table, id, x, y, 0);
-            if (v == cell_value)
-            {
-                count++;
-            }
-            else
-            {
-                // flush previous
-                if (cell_value >= 0.0f)
-                {
-                    if (count > 1)
-                        p += sprintf(p, "%d%c", (int)count, cell_value > 0.5f ? 'o' : 'b');
-                    else
-                        p += sprintf(p, "%c", cell_value > 0.5f ? 'o' : 'b');
-                }
-                // start new
-                cell_value = v;
-                count = 1;
-            }
-        }
-        // flush end of line
-        if (cell_value >= 0.0f)
-        {
-            if (count > 1)
-                p += sprintf(p, "%d%c", (int)count, cell_value > 0.5f ? 'o' : 'b');
-            else
-                p += sprintf(p, "%c", cell_value > 0.5f ? 'o' : 'b');
-        }
-        // line end
-        p += sprintf(p, "$");
-    }
-    // end marker
-    sprintf(p, "!");
 }

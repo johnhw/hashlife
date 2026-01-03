@@ -53,7 +53,7 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
 /* Initalisation */
 void init_table(node_table *table);
 node_table *create_table(uint64_t initial_size);
-node_id base_life(node_table *table, node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i);
+node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i);
 node_id life_4x4(node_table *table, node_id m_h);
 void init_table(node_table *table);
 
@@ -71,7 +71,7 @@ node_id pad(node_table *table, node_id id);
 
 /* Cell I/O */
 node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool state);
-float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, int level);
+float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, uint64_t level);
 void rasterise(node_table *table, node_id id, float *buf, uint64_t buf_width, uint64_t buf_height, uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t min_level);
 
 /* RLE */
@@ -79,3 +79,5 @@ bool is_tok(char ch);
 char *read_one(char *s, char *state, int *count);
 node_id from_rle(node_table *table, char *rle_str);
 void to_rle(node_table *table, node_id id, char *buf);
+node_id from_text(node_table *table, char *text);
+void to_text(node_table *table, node_id id, char *buf);
