@@ -145,8 +145,8 @@ node_id from_rle(node_table *table, char *rle_str)
     char state;
     int count;
     uint64_t x = 0, y = 0;
-    node_id root = table->off;
-
+    node_id root = table->zeros[2];
+    int pop = 0;
     while (1)
     {
         s = read_one(s, &state, &count);
@@ -161,7 +161,9 @@ node_id from_rle(node_table *table, char *rle_str)
             for (int i = 0; i < count; i++)
             {
                 root = set_cell(table, root, x, y, true);
-                x++;
+                
+                x++;                
+                pop++;
             }
         }
         else if (state == '$')
@@ -170,6 +172,7 @@ node_id from_rle(node_table *table, char *rle_str)
             x = 0;
         }
     }
+    
     return root;
 }
 

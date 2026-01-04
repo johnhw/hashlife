@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -g -Wall -Wextra -std=c11 -pedantic
 TARGET = test_hashlife
-OBJS = test_hashlife.o hashlife.o cell_io.o
+OBJS = test_hashlife.o hashlife.o cell_io.o timeit.o
 
 .PHONY: all clean
 
@@ -18,6 +18,9 @@ hashlife.o: hashlife.c
 
 cell_io.o: cell_io.c
 	$(CC) $(CFLAGS) -c cell_io.c
+	
+timeit.o: timeit.c
+	$(CC) $(CFLAGS) -c timeit.c
 
 clean:
 	rm -f $(TARGET) $(OBJS)

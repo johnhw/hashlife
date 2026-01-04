@@ -230,13 +230,9 @@ node_id sucjoin(node_table *table, node_id a, node_id b, node_id c, node_id d, u
 /* Find the successor of the given node, 2^level-2 steps in the future */
 node_id successor(node_table *table, node_id id, uint64_t j)
 {
-
     node *n = lookup(table, id);
     if (n->pop == 0)
         return n->a;
-    if (n->level == 2)
-        return n->next; // guaranteed to be cached
-    j = min(j, n->level - 2);
     // store the node locally to ensure it does not change during processing
     node ncopy;
     ncopy = *n;
@@ -285,17 +281,19 @@ node_id successor(node_table *table, node_id id, uint64_t j)
 /* Return the successor for this node, caching it as required */
 node_id next(node_table *table, node_id id, uint64_t j)
 {
-    uint64_t level = lookup(table, id)->level;
-    if (j == 0)
-        j = level - 2;
+    node *n = lookup(table, id);
+    if(n->pop==0)
+        return n->a;
 
-    if (j == level - 2)
+    uint64_t level = n->level;
+    if (j == 0 || j >= level - 2)
     {
-        // cache the natural successor
-        node *n = lookup(table, id);
+        // cache the natural successor        
         if (!n->next)
         {
-            n->next = successor(table, id, j);
+            node_id succ = successor(table, id, level - 2);
+            n = lookup(table, id); 
+            n->next = succ;
             incref(table, n->next);
         }
         return n->next;
@@ -329,11 +327,11 @@ node_id advance(node_table *table, node_id id, uint64_t steps)
 
     uint64_t j = 1;
     while (steps > 0)
-    {        
+    {
         if (steps & 1)
             id = centre(table, next(table, id, j));
         j++;
-        steps >>=1;
+        steps >>= 1;
     }
     // crop for the caller
     return crop(table, id);
