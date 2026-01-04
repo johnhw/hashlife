@@ -1,4 +1,6 @@
 #include "hashlife.h"
+#include "cell_io.h"
+#include <stdbool.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -512,12 +514,20 @@ int time_advance_256()
     return lookup(timing_table, pattern)->pop;
 }
 
-int time_advance_255()
+int time_advance_65535()
 {
     node_id pattern = timing_pattern;
-    pattern = advance(timing_table, pattern, 255);
+    pattern = advance(timing_table, pattern, 65535);
     return lookup(timing_table, pattern)->pop;
 }
+
+int time_advance_65536()
+{
+    node_id pattern = timing_pattern;
+    pattern = advance(timing_table, pattern, 65536);
+    return lookup(timing_table, pattern)->pop;
+}
+
 
 int load_rle_time()
 {
@@ -542,13 +552,12 @@ int main()
     timing_table = create_table(131072);
     timing_pattern = load_rle(timing_table, "pat/breeder.rle");
     timeit(time_next, "Advance breeder ", 500, 50, 7);
-    char *gosper_rle = "24bo11b$22bobo11b$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o14b$2o8b\no3bob2o4bobo11b$10bo5bo7bo11b$11bo3bo20b$12b2o!";
-    timing_pattern = from_rle(timing_table, gosper_rle);
-    
-    timeit(time_advance_1, "Advance gun by 1", 500, 50, 7);
-    timeit(time_advance_64, "Advance gun by 64", 500, 50, 7);
-    timeit(time_advance_256, "Advance gun by 256", 500, 50, 7);
-    timeit(time_advance_255, "Advance gun by 255", 500, 50, 7);
+
+    timeit(time_advance_1, "Advance breeder by 1", 500, 50, 7);
+    timeit(time_advance_64, "Advance breeder by 64", 500, 50, 7);
+    timeit(time_advance_256, "Advance breeder by 256", 500, 50, 7);
+    timeit(time_advance_65535, "Advance breeder by 65535", 500, 50, 7);
+    timeit(time_advance_65536, "Advance breeder by 65536", 500, 50, 7);
     timeit(load_rle_time, "Load Gosper glider gun RLE", 1000, 100, 7);
 
 

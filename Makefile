@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall -Wextra -std=c11 -pedantic
+CFLAGS = -O4 -Wall -Wextra -std=c11 -pedantic -DNDEBUG
 TARGET = test_hashlife
 OBJS = test_hashlife.o hashlife.o cell_io.o timeit.o
 

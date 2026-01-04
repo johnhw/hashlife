@@ -220,12 +220,12 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
     return hash;
 }
 
-node_id sucjoin(node_table *table, node_id a, node_id b, node_id c, node_id d, uint64_t j)
+static inline node_id sucjoin(node_table *table, node_id a, node_id b, node_id c, node_id d, uint64_t j)
 {
     return next(table, join(table, a, b, c, d), j);
 }
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
+
 
 /* Find the successor of the given node, 2^level-2 steps in the future */
 node_id successor(node_table *table, node_id id, uint64_t j)
@@ -299,9 +299,17 @@ node_id next(node_table *table, node_id id, uint64_t j)
         return n->next;
     }
     else
-    {
-        // compute, but don't cache
-        return successor(table, id, j);
+    {        
+        if(j>=MAX_J_CACHE)
+            return successor(table, id, j);
+        if(n->nexts[j])
+            return n->nexts[j];
+        node_id succ = successor(table, id, j);
+        n = lookup(table, id);
+        n->nexts[j] = succ;
+        incref(table, n->nexts[j]);
+        return succ;
+        
     }
 }
 
