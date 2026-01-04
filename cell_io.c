@@ -31,12 +31,13 @@ node_id from_text(node_table *table, char *txt)
 }
 
 /* Convert a hashlife node to a .* style plain text pattern
-    The buffer must be large enough to hold the output.
+    Allocates a buffer; caller must free it.
 */
-void to_text(node_table *table, node_id id, char *buf)
+char *to_text(node_table *table, node_id id)
 {
-    char *p = buf;
     uint64_t size = 1ULL << lookup(table, id)->level;
+    char *p = malloc(size * (size + 1) + 1); // include newlines and null terminator
+    char *start = p;
     for (uint64_t y = 0; y < size; y++)
     {
         for (uint64_t x = 0; x < size; x++)
@@ -47,6 +48,7 @@ void to_text(node_table *table, node_id id, char *buf)
         *p++ = '\n';        
     }
     *p++ = 0;
+    return start;
 }
 
 

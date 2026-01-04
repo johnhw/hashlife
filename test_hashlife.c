@@ -316,23 +316,22 @@ void test_advance()
     node_table *table = create_table(64);
     char *mickey_mouse = ".OO....OO\nO..O..O..O\nO..OOOO..O\n.OO....OO\n...OOOO\n...O..O\n....OO";
     node_id mickey = from_text(table, mickey_mouse);
-    
+    char *buf;
     mickey = centre(table, centre(table, mickey));
     verify_children(table);
     verify_tree(table, mickey, lookup(table, mickey)->level);
 
     print_node(table, mickey);
     node_id succ = next(table, mickey);
-    print_node(table, succ);
-    char buf[1<<20];
-    to_text(table, succ, buf);
+    print_node(table, succ);    
+    buf = to_text(table, succ);
     succ = next(table, succ);
 
     printf("Advanced pattern (next):\n%s\n", buf);
 
 
     node_id next_1 = advance(table, mickey, 8);
-    to_text(table, next_1, buf);
+    buf = to_text(table, next_1);
     printf("Advanced pattern (advance):\n%s\n", buf);
 
     char *gosper_gun = "........................O\n......................O.O\n............OO......OO............OO\n...........O...O....OO............OO\nOO........O.....O...OO\nOO........O...O.OO....O.O\n..........O.....O.......O\n...........O...O\n............OO";
@@ -340,7 +339,7 @@ void test_advance()
     for(int i=0;i<30;i++)
     {
         node_id g = advance(table, gun, i);        
-        to_text(table, g, buf);
+        buf = to_text(table, g);
         printf("Gun at step %d:\n%s\n", i, buf);
     }
 
@@ -352,19 +351,20 @@ void test_pattern()
 {
     TEST_START("Testing pattern import/export");
     node_table *table = create_table(64);
+    char *buf;
     char *mickey_mouse = ".OO....OO\nO..O..O..O\nO..OOOO..O\n.OO....OO\n...OOOO\n...O..O\n....OO";
     node_id mickey = from_text(table, mickey_mouse);
     print_node(table, mickey);
-    char buf[2048];
-    to_text(table, mickey, buf);
+    
+    buf = to_text(table, mickey);
     printf("Original pattern:\n%s\n", mickey_mouse);
     
     printf("Converted pattern:\n%s\n", buf);
     node_id centered = centre(table, mickey);
-    to_text(table, centered, buf);
+    buf = to_text(table, centered);
     printf("Centered converted pattern:\n%s\n", buf);
     node_id cropped = crop(table, mickey);
-    to_text(table, cropped, buf);
+    buf = to_text(table, cropped);
     printf("Cropped centred converted pattern:\n%s\n", buf);
     printf("Testing inner/center/pad/crop functions on pattern\n");
     test_inner(table, mickey);

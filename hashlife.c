@@ -220,111 +220,123 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
     return hash;
 }
 
-
-node_id sucjoin(node_table *table, node_id a, node_id b, node_id c, node_id d)
+node_id sucjoin(node_table *table, node_id a, node_id b, node_id c, node_id d, uint64_t j)
 {
-    return next(table, join(table, a, b, c, d));    
+    return next(table, join(table, a, b, c, d), j);
 }
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 /* Find the successor of the given node, 2^level-2 steps in the future */
-node_id successor(node_table *table, node_id id)
+node_id successor(node_table *table, node_id id, uint64_t j)
 {
-    
+
     node *n = lookup(table, id);
     if (n->pop == 0)
         return n->a;
     if (n->level == 2)
-       return n->next; // guaranteed to be cached
-    
+        return n->next; // guaranteed to be cached
+    j = min(j, n->level - 2);
     // store the node locally to ensure it does not change during processing
     node ncopy;
     ncopy = *n;
-    n = &ncopy;    
+    n = &ncopy;
 
     node_id c1, c2, c3, c4, c5, c6, c7, c8, c9;
-    
-    c1 = sucjoin(table, n->aa, n->ab, n->ac, n->ad);
-    c2 = sucjoin(table, n->ab, n->ba, n->ad, n->bc);
-    c3 = sucjoin(table, n->ba, n->bb, n->bc, n->bd);
-    c4 = sucjoin(table, n->ac, n->ad, n->ca, n->cb);
-    c5 = sucjoin(table, n->ad, n->bc, n->cb, n->da);
-    c6 = sucjoin(table, n->bc, n->bd, n->da, n->db);
-    c7 = sucjoin(table, n->ca, n->cb, n->cc, n->cd);
-    c8 = sucjoin(table, n->cb, n->da, n->cd, n->dc);
-    c9 = sucjoin(table, n->da, n->db, n->dc, n->dd);
 
-    return join(table,
-                sucjoin(table, c1, c2, c4, c5),
-                sucjoin(table, c2, c3, c5, c6),
-                sucjoin(table, c4, c5, c7, c8),
-                sucjoin(table, c5, c6, c8, c9));
+    c1 = sucjoin(table, n->aa, n->ab, n->ac, n->ad, j);
+    c2 = sucjoin(table, n->ab, n->ba, n->ad, n->bc, j);
+    c3 = sucjoin(table, n->ba, n->bb, n->bc, n->bd, j);
+    c4 = sucjoin(table, n->ac, n->ad, n->ca, n->cb, j);
+    c5 = sucjoin(table, n->ad, n->bc, n->cb, n->da, j);
+    c6 = sucjoin(table, n->bc, n->bd, n->da, n->db, j);
+    c7 = sucjoin(table, n->ca, n->cb, n->cc, n->cd, j);
+    c8 = sucjoin(table, n->cb, n->da, n->cd, n->dc, j);
+    c9 = sucjoin(table, n->da, n->db, n->dc, n->dd, j);
+
+    /* Not the natural successor; combine parts */
+    if (j < n->level - 2)
+    {
+        node *c1n = lookup(table, c1);
+        node *c2n = lookup(table, c2);
+        node *c3n = lookup(table, c3);
+        node *c4n = lookup(table, c4);
+        node *c5n = lookup(table, c5);
+        node *c6n = lookup(table, c6);
+        node *c7n = lookup(table, c7);
+        node *c8n = lookup(table, c8);
+        node *c9n = lookup(table, c9);
+
+        return join(table,
+                    join(table, c1n->d, c2n->c, c4n->b, c5n->a),
+                    join(table, c2n->d, c3n->c, c5n->b, c6n->a),
+                    join(table, c4n->d, c5n->c, c7n->b, c8n->a),
+                    join(table, c5n->d, c6n->c, c8n->b, c9n->a));
+    }
+    else
+        /* Natural successor */
+        return join(table,
+                    sucjoin(table, c1, c2, c4, c5, j),
+                    sucjoin(table, c2, c3, c5, c6, j),
+                    sucjoin(table, c4, c5, c7, c8, j),
+                    sucjoin(table, c5, c6, c8, c9, j));
 }
 
 /* Return the successor for this node, caching it as required */
-node_id next(node_table *table, node_id id)
+node_id next(node_table *table, node_id id, uint64_t j)
 {
-    node *n = lookup(table, id);
-    if (!n->next)
+    uint64_t level = lookup(table, id)->level;
+    if (j == 0)
+        j = level - 2;
+
+    if (j == level - 2)
     {
-        n->next = successor(table, id);
-        incref(table, n->next);
+        // cache the natural successor
+        node *n = lookup(table, id);
+        if (!n->next)
+        {
+            n->next = successor(table, id, j);
+            incref(table, n->next);
+        }
+        return n->next;
     }
-    return n->next;
+    else
+    {
+        // compute, but don't cache
+        return successor(table, id, j);
+    }
 }
 
 /* Advance time by j steps.
     - Find the MSB of j
     - Make sure that the node has a level at least big enough
-    
+
 */
-node_id advance(node_table *table, node_id id, uint64_t j)
+node_id advance(node_table *table, node_id id, uint64_t steps)
 {
-    // find the position of the MSB of j
-    uint64_t msb = 0;
-    uint64_t temp = j;
-    while (temp >>= 1)
-        msb++;
     node *n = lookup(table, id);
-    // ensure the node is big enough
-    while (n->level <= msb + 1)
+    // ensure the node is big enough; n->level must be > log2(steps)+2
+    while ((1ULL << (n->level - 2)) < steps)
     {
+        // pad the node
         id = centre(table, id);
         n = lookup(table, id);
     }
-    // pad once to the centre
+
+    // pad to the centre
     id = centre(table, id);
     n = lookup(table, id);
-    
-    // crop for the caller
-    return skip(table, id, j);
-}
 
-/* 
-    TODO: fix logic here; this isn't correct
-    Skip forward by j generations 
-   Node must be appropriated padded already.
-*/
-node_id skip(node_table *table, node_id id, uint64_t j)
-{
-    if (j == 0)
-        return id;
-    node *n = lookup(table, id);
-    if(n->pop == 0)
-        return id; 
-    uint64_t msb = 0;
-    uint64_t temp = j;
-    while (temp >>= 1)
-        msb++;
-    // are we at the correct level?
-    if(n->level == msb + 2)
-    {
-        // keep going with the bit knocked out
-        return skip(table, next(table, id),  j ^ (1ULL << msb));
+    uint64_t j = 1;
+    while (steps > 0)
+    {        
+        if (steps & 1)
+            id = centre(table, next(table, id, j));
+        j++;
+        steps >>=1;
     }
-    // go deeper
-    return join(table, skip(table, n->a, j),
-                      skip(table, n->b, j),
-                      skip(table, n->c, j),
-                      skip(table, n->d, j));
+    // crop for the caller
+    return crop(table, id);
 }
 
 /* Compute the life rule on the 3x3 neighbourhood
@@ -337,7 +349,7 @@ node_id skip(node_table *table, node_id id, uint64_t j)
 */
 node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i)
 {
-    /* hash 1 = off, hash 2 = on, by definition*/    
+    /* hash 1 = off, hash 2 = on, by definition*/
     int pop_sum = (a - 1) + (b - 1) + (c - 1) + (d - 1) + (f - 1) + (g - 1) + (h - 1) + (i - 1);
     bool alive = pop_sum == 3 || (pop_sum == 2 && e == 2);
     return alive + 1;
@@ -352,22 +364,21 @@ node_id life_4x4(node_table *table, node_id m_h)
     nb = base_life(m->ab, m->ba, m->bb, m->ad, m->bc, m->bd, m->cb, m->da, m->db);
     nc = base_life(m->ac, m->ad, m->bc, m->ca, m->cb, m->da, m->cc, m->cd, m->dc);
     nd = base_life(m->ad, m->bc, m->bd, m->cb, m->da, m->db, m->cd, m->dc, m->dd);
-    return join(table, na, nb, nc, nd);    
+    return join(table, na, nb, nc, nd);
 }
 
 /* Initialise the zero cache and the on and off base nodes */
 void init_table(node_table *table)
 {
-    node_id base_tile[16];              // all 2x2 combinations of on and off cells
+    node_id base_tile[16]; // all 2x2 combinations of on and off cells
 
     /* cell level nodes */
-    
+
     table->index[1] = (node){.level = 0, .a = 0, .b = 0, .c = 0, .d = 0, .pop = 0, .id = 1, .ref_count = -1}; // off node
     table->index[2] = (node){.level = 0, .a = 0, .b = 0, .c = 0, .d = 0, .pop = 1, .id = 2, .ref_count = -1}; // on node
     table->count = 2;
     table->on = 2;
     table->off = 1;
-
 
     /* all empty nodes */
     table->zeros[0] = table->off;
@@ -391,7 +402,7 @@ void init_table(node_table *table)
         // mark as immortal
         lookup(table, id)->ref_count = -1;
     }
-    
+
     /* 4x4 nodes */
     for (int i = 0; i < 65536; i++)
     {
@@ -404,7 +415,7 @@ void init_table(node_table *table)
         node *n = lookup(table, id);
         // mark as immortal
         n->ref_count = -1;
-        // map the successor for 4x4 -> 2x2 nodes        
+        // map the successor for 4x4 -> 2x2 nodes
         n->next = next_generation;
     }
 }
@@ -466,7 +477,7 @@ node_id pad(node_table *table, node_id id)
 /* Set the cell at the given position, returning the new node */
 node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool state)
 {
-    node *n = lookup(table, id);    
+    node *n = lookup(table, id);
     if (n->level == 0)
     {
         if (state)
@@ -477,7 +488,7 @@ node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool sta
 
     // expand the node until x < 1<< (level-1) and y < 1 << (level-1)
     while (x >= (1ULL << n->level) || y >= (1ULL << n->level))
-    {        
+    {
         node_id z = table->zeros[n->level];
         id = join(table, id, z, z, z);
         n = lookup(table, id);
