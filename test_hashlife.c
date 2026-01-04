@@ -310,6 +310,14 @@ void test_set_get(node_table *table)
     TEST_OK("Set and Get cells verified");
 }
 
+bool verify_same(node_table *table, node_id id1, char *original)
+{
+    char *buf = to_text(table, id1);
+    assert(hash_life_text(buf) == hash_life_text(original));
+    free(buf);
+    return true;
+}
+
 void test_advance()
 {
     TEST_START("Testing pattern advancement");
@@ -317,22 +325,21 @@ void test_advance()
     char *mickey_mouse = ".OO....OO\nO..O..O..O\nO..OOOO..O\n.OO....OO\n...OOOO\n...O..O\n....OO";
     node_id mickey = from_text(table, mickey_mouse);
     char *buf;
+    /* Generate the pattern and verify it */
     mickey = centre(table, centre(table, mickey));
     verify_children(table);
     verify_tree(table, mickey, lookup(table, mickey)->level);
-
     print_node(table, mickey);
-    node_id succ = next(table, mickey);
+    node_id succ = next(table, mickey, 0);
+    verify_same(table, succ, mickey_mouse);
     print_node(table, succ);    
-    buf = to_text(table, succ);
-    succ = next(table, succ);
-
-    printf("Advanced pattern (next):\n%s\n", buf);
-
-
+    printf("Still life test one passed\n");
+    succ = next(table, succ, 0);
+    verify_same(table, succ, mickey_mouse);
+    printf("Still life test two passed\n");    
     node_id next_1 = advance(table, mickey, 8);
-    buf = to_text(table, next_1);
-    printf("Advanced pattern (advance):\n%s\n", buf);
+    verify_same(table, next_1, mickey_mouse);
+    printf("Still life variable step with advance passed");
 
     char *gosper_gun = "........................O\n......................O.O\n............OO......OO............OO\n...........O...O....OO............OO\nOO........O.....O...OO\nOO........O...O.OO....O.O\n..........O.....O.......O\n...........O...O\n............OO";
     node_id gun = from_text(table, gosper_gun);
@@ -340,7 +347,7 @@ void test_advance()
     {
         node_id g = advance(table, gun, i);        
         buf = to_text(table, g);
-        printf("Gun at step %d:\n%s\n", i, buf);
+        free(buf);
     }
 
 

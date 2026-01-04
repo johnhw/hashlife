@@ -1,7 +1,5 @@
 #include "hashlife.h"
 
-
-
 /* Read a .* style plain text pattern
     and return the corresponding hashlife node
 */
@@ -14,17 +12,17 @@ node_id from_text(node_table *table, char *txt)
     {
         switch (*p++)
         {
-            case 'O':
-                root = set_cell(table, root, x, y, 1);
-                x++;
-                break;
-            case '.':
-                x++;
-                break;
-            case '\n':
-                y++;
-                x = 0;
-                break;
+        case 'O':
+            root = set_cell(table, root, x, y, 1);
+            x++;
+            break;
+        case '.':
+            x++;
+            break;
+        case '\n':
+            y++;
+            x = 0;
+            break;
         }
     }
     return root;
@@ -43,15 +41,48 @@ char *to_text(node_table *table, node_id id)
         for (uint64_t x = 0; x < size; x++)
         {
             float v = get_cell(table, id, x, y, 0);
-            *p++ = v>0.5f ? 'O' : '.';
+            *p++ = v > 0.5f ? 'O' : '.';
         }
-        *p++ = '\n';        
+        *p++ = '\n';
     }
     *p++ = 0;
     return start;
 }
 
-
+uint64_t hash_life_text(char *text)
+{
+    uint64_t seed = mix64(0xdeadbeef);
+    char *p = text;
+    uint64_t x = 0, y = 0, ax = 0, ay = 0, anchored = 0;
+    uint64_t dx, dy;
+    while (*p)
+    {
+        switch (*p++)
+        {
+        case 'O':
+            if (!anchored)
+            {
+                anchored = 1;
+                ax = x;
+                ay = y;
+            }
+            dx = x - ax;
+            dy = y - ay;
+            seed = mix64(dx ^ seed);
+            seed = mix64(dy ^ seed);
+            x++;
+            break;
+        case '.':
+            x++;
+            break;
+        case '\n':
+            y++;
+            x = 0;
+            break;
+        }
+    }
+    return seed;
+}
 
 /* Rasterise to an image */
 void rasterise(node_table *table, node_id id, float *buf, uint64_t buf_width, uint64_t buf_height, uint64_t x, uint64_t y, uint64_t width, uint64_t height, uint64_t min_level)
