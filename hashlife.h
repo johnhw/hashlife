@@ -20,7 +20,9 @@ typedef struct node
     node_id id;
     uint64_t level;
     node_id a, b, c, d;                                                     // children
+    #ifdef GRANDCHILDREN_CACHE
     node_id aa, ab, ac, ad, ba, bb, bc, bd, ca, cb, cc, cd, da, db, dc, dd; // grandchildren
+    #endif 
     node_id next;                                                           // cached natural successor
     uint64_t pop;
     int32_t ref_count; // 0 = ready to free, negative = immortal

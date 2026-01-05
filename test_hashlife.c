@@ -55,6 +55,7 @@ void verify_children(node_table *table)
                 assert(c != NULL && c->level == n->level - 1);
                 assert(d != NULL && d->level == n->level - 1);
             }
+            #ifdef GRANDCHILDREN_CACHE
             if (n->level > 1)
             {
                 node *a = lookup(table, n->a);
@@ -110,6 +111,7 @@ void verify_children(node_table *table)
                 assert(dc == lookup(table, d->c));
                 assert(dd == lookup(table, d->d));
             }
+            #endif 
         }
     }
     TEST_OK("Children verified");
@@ -431,7 +433,7 @@ void test_rle()
 
     /* check that from_rle -> to_rle -> from_rle does not change the pattern */
     
-    char * rle_buf = to_rle(table, rle_gun, rle_buf);
+    char * rle_buf = to_rle(table, rle_gun);
     node_id cycle_rle_gun = from_rle(table, rle_buf);
     assert(verify_same(table, cycle_rle_gun, gosper_gun));
     free(rle_buf);
@@ -465,7 +467,7 @@ static node_id timing_pattern;
 int time_next()
 {
     node_id pattern = timing_pattern;
-    for(int i=0;i<16;i++)
+    for(int i=0;i<128;i++)
         pattern = next(timing_table, centre(timing_table, centre(timing_table, pattern)), 0);
     return lookup(timing_table, pattern)->pop;
 }
@@ -530,14 +532,14 @@ int main()
 
     /* timing tests */
     timing_table = create_table(131072);
-    timing_pattern = load_rle(timing_table, "pat/breeder.rle");
-    timeit(time_next, "Advance breeder ", 500, 50, 7);
+    timing_pattern = read_rle(timing_table, "pat/rendell.rle");
+    timeit(time_next, "Advance pattern ", 500, 50, 7);
 
-    timeit(time_advance_1, "Advance breeder by 1", 500, 50, 7);
-    timeit(time_advance_64, "Advance breeder by 64", 500, 50, 7);
-    timeit(time_advance_256, "Advance breeder by 256", 500, 50, 7);
-    timeit(time_advance_65535, "Advance breeder by 65535", 500, 50, 7);
-    timeit(time_advance_65536, "Advance breeder by 65536", 500, 50, 7);
+    timeit(time_advance_1, "Advance by 1", 500, 50, 7);
+    timeit(time_advance_64, "Advance by 64", 500, 50, 7);
+    timeit(time_advance_256, "Advance by 256", 500, 50, 7);
+    timeit(time_advance_65535, "Advance by 65535", 500, 50, 7);
+    timeit(time_advance_65536, "Advance by 65536", 500, 50, 7);
     timeit(load_rle_time, "Load Gosper glider gun RLE", 1000, 100, 7);
 
 
