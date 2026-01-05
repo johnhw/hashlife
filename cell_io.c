@@ -6,7 +6,7 @@
 */
 node_id from_text(node_table *table, char *txt)
 {
-    node_id root = table->zeros[1];
+    node_id root = get_zero(table, 2); 
     uint64_t x = 0, y = 0;
     char *p = txt;
     while (*p)
@@ -146,7 +146,7 @@ node_id from_rle(node_table *table, char *rle_str)
     char state;
     int count;
     uint64_t x = 0, y = 0;
-    node_id root = table->zeros[2];
+    node_id root = get_zero(table, 2);
     int pop = 0;
     while (1)
     {

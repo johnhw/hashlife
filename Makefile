@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -pedantic 
-CFLAGS_DEBUG = -g -DDEBUG -pg
+CFLAGS_DEBUG = -g -DDEBUG  -fstack-protector-strong -fno-omit-frame-pointer
 CFLAGS_OPT = -O4 -DNDEBUG -pg 
 CFLAGS += $(CFLAGS_OPT)
 TARGET = test_hashlife

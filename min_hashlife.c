@@ -23,6 +23,7 @@ typedef struct node
     uint64_t pop;
 } node;
 
+
 typedef struct node_table
 {
     node *index;
@@ -147,6 +148,7 @@ void resize_table(node_table *table)
     table->index = new_index;
     table->size = new_size;
 }
+
 
 /* Join four nodes.
    - If the node exists, return it from the table.

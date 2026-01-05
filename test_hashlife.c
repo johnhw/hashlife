@@ -55,63 +55,7 @@ void verify_children(node_table *table)
                 assert(c != NULL && c->level == n->level - 1);
                 assert(d != NULL && d->level == n->level - 1);
             }
-            #ifdef GRANDCHILDREN_CACHE
-            if (n->level > 1)
-            {
-                node *a = lookup(table, n->a);
-                node *b = lookup(table, n->b);
-                node *c = lookup(table, n->c);
-                node *d = lookup(table, n->d);
-                node *aa = lookup(table, n->aa);
-                node *ab = lookup(table, n->ab);
-                node *ac = lookup(table, n->ac);
-                node *ad = lookup(table, n->ad);
-                node *ba = lookup(table, n->ba);
-                node *bb = lookup(table, n->bb);
-                node *bc = lookup(table, n->bc);
-                node *bd = lookup(table, n->bd);
-                node *ca = lookup(table, n->ca);
-                node *cb = lookup(table, n->cb);
-                node *cc = lookup(table, n->cc);
-                node *cd = lookup(table, n->cd);
-                node *da = lookup(table, n->da);
-                node *db = lookup(table, n->db);
-                node *dc = lookup(table, n->dc);
-                node *dd = lookup(table, n->dd);
-                assert(aa != NULL && aa->level == n->level - 2);
-                assert(ab != NULL && ab->level == n->level - 2);
-                assert(ac != NULL && ac->level == n->level - 2);
-                assert(ad != NULL && ad->level == n->level - 2);
-                assert(ba != NULL && ba->level == n->level - 2);
-                assert(bb != NULL && bb->level == n->level - 2);
-                assert(bc != NULL && bc->level == n->level - 2);
-                assert(bd != NULL && bd->level == n->level - 2);
-                assert(ca != NULL && ca->level == n->level - 2);
-                assert(cb != NULL && cb->level == n->level - 2);
-                assert(cc != NULL && cc->level == n->level - 2);
-                assert(cd != NULL && cd->level == n->level - 2);
-                assert(da != NULL && da->level == n->level - 2);
-                assert(db != NULL && db->level == n->level - 2);
-                assert(dc != NULL && dc->level == n->level - 2);
-                assert(dd != NULL && dd->level == n->level - 2);
-                assert(aa == lookup(table, a->a));
-                assert(ab == lookup(table, a->b));
-                assert(ac == lookup(table, a->c));
-                assert(ad == lookup(table, a->d));
-                assert(ba == lookup(table, b->a));
-                assert(bb == lookup(table, b->b));
-                assert(bc == lookup(table, b->c));
-                assert(bd == lookup(table, b->d));
-                assert(ca == lookup(table, c->a));
-                assert(cb == lookup(table, c->b));
-                assert(cc == lookup(table, c->c));
-                assert(cd == lookup(table, c->d));
-                assert(da == lookup(table, d->a));
-                assert(db == lookup(table, d->b));
-                assert(dc == lookup(table, d->c));
-                assert(dd == lookup(table, d->d));
-            }
-            #endif 
+            
         }
     }
     TEST_OK("Children verified");
@@ -129,7 +73,7 @@ uint64_t verify_tree(node_table *table, node_id id, uint64_t level)
     assert(n != NULL);
     if (n->level == 0)
     {
-        assert(id == table->on || id == table->off);
+        assert(id == ON || id == OFF);
         return n->pop;
     }
     else
@@ -207,54 +151,12 @@ void test_init()
     printf("Table size: %llu\n", table->size);
     assert(table != NULL);
     printf("Table was not NULL\n");
-    assert(lookup(table, table->on) != NULL);
-    assert(lookup(table, table->off) != NULL);
-    printf("On and Off nodes were not NULL\n");
     node *on, *off;
-    on = lookup(table, table->on);
-    off = lookup(table, table->off);
+    on = lookup(table, ON);
+    off = lookup(table, OFF);
     assert(on->pop == 1);
     assert(off->pop == 0);
-    assert(on->id == 2);
-    assert(off->id == 1);
-
-    // verify all zero nodes are zero population and have correct level
-    for (int i = 0; i < ZERO_CACHE_MAX_SIZE; i++)
-    {
-        node *z = lookup(table, table->zeros[i]);
-        assert(z != NULL);
-        assert(z->pop == 0);
-        assert(z->level == (uint64_t)i);
-    }
-    printf("All zero nodes verified\n");
-    verify_hashtable(table);
-
-    verify_children(table);
-    verify_whole_tree(table);
-
-    // all 4x4 nodes have a valid next pointer to a 2x2 node
-    for (uint64_t i = 0; i < table->size; i++)
-    {
-        node *n = &table->index[i];
-        if (n->id != 0 && n->level == 2)
-        {
-            // should have a valid next pointer to a 2x2 node
-            node *next_n = lookup(table, n->next);
-            assert(next_n != NULL);
-            assert(next_n->level == 1);
-        }
-    }
-    printf("All 4x4 nodes have valid next pointers\n");
-    for (uint64_t i = 0; i < table->size; i++)
-    {
-        node *n = &table->index[i];
-        if (n->id != 0)
-        {
-            // all nodes should be immortal at this point
-            assert(n->ref_count == -1);
-        }
-    }
-    printf("All nodes are immortal\n");
+    printf("On and Off nodes verified\n");  
     TEST_OK("Table initialisation verified");
 }
 
@@ -273,7 +175,7 @@ void test_set_get()
     }
     TEST_START("Testing set and get cells");
     // set cells
-    node_id node = table->zeros[2]; // 4x4 block
+    node_id node = get_zero(table, 2); // 4x4 block
     // set 3, 7, check it, clear it, check it
     node = set_cell(table, node, 3, 7, 1);
     assert(lookup(table, node)->pop == 1);
@@ -334,12 +236,13 @@ void test_still_life()
     mickey = centre(table, centre(table, mickey));
     verify_children(table);
     verify_tree(table, mickey, lookup(table, mickey)->level);
-    
-    node_id succ = next(table, mickey, 0);
+
+    node_id succ = successor(table, mickey, 0);
+
     assert(verify_same(table, succ, mickey_mouse));
     
     printf("Still life test one passed\n");
-    succ = next(table, succ, 0);
+    succ = successor(table, succ, 0);
     assert(verify_same(table, succ, mickey_mouse));
     printf("Still life test two passed\n");    
     node_id next_1 = advance(table, mickey, 8);
@@ -382,7 +285,7 @@ void test_gun()
     uint64_t last_pop = lookup(table, gun)->pop;
     for(int i=0;i<10;i++)
     {
-        gun = next(table,  centre(table, centre(table, gun)), 0);
+        gun = successor(table,  centre(table, centre(table, gun)), 0);
         
         uint64_t pop = lookup(table, gun)->pop;
         assert(pop >= last_pop);
@@ -468,7 +371,7 @@ int time_next()
 {
     node_id pattern = timing_pattern;
     for(int i=0;i<128;i++)
-        pattern = next(timing_table, centre(timing_table, centre(timing_table, pattern)), 0);
+        pattern = successor(timing_table, centre(timing_table, centre(timing_table, pattern)), 0);
     return lookup(timing_table, pattern)->pop;
 }
 
@@ -500,6 +403,16 @@ int time_advance_65535()
 {
     node_id pattern = timing_pattern;
     pattern = advance(timing_table, pattern, 65535);
+    // report the total number of entries where from is non-zero
+    uint64_t count = 0;
+    for(uint64_t i=0;i<timing_table->size;i++)
+    {
+        node *n = &timing_table->index[i];
+        if(n->from != 0)
+            count++;
+    }
+    printf("Cache load factor: %f%%\n", (count * 100.0) / timing_table->size);
+
     return lookup(timing_table, pattern)->pop;
 }
 
@@ -510,6 +423,35 @@ int time_advance_65536()
     return lookup(timing_table, pattern)->pop;
 }
 
+
+void test_vacuum()
+{
+    TEST_START("Testing vacuum function");
+    node_table *table = create_table(128);
+    char *gosper_rle = "24bo11b$22bobo11b$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o14b$2o8b\no3bob2o4bobo11b$10bo5bo7bo11b$11bo3bo20b$12b2o!";
+    node_id pattern = from_rle(table, gosper_rle);
+    node_id original_pattern = pattern;
+    uint64_t before_count, after_count;
+    vacuum(table, pattern);
+    before_count = table->count;
+    vacuum(table, pattern);
+    after_count = table->count;
+    assert(after_count == before_count);
+    printf("Vacuum did not remove any nodes when all reachable\n");
+
+    /* generate junk via advance */
+    for(int i=0;i<100;i++)
+    {
+        pattern = advance(table, pattern, 1);
+    }
+    before_count = table->count;
+    vacuum(table, original_pattern);
+    after_count = table->count;
+    assert(after_count < before_count);
+    printf("Vacuum removed unreachable nodes\n");
+
+    TEST_OK("Vacuum function verified");
+}
 
 int load_rle_time()
 {
@@ -522,23 +464,43 @@ int load_rle_time()
 
 void timeit(int (*func)(void), const char *name, int iters, int warm, int trials);
 
+void test_zeros()
+{
+    TEST_START("Testing zero node creation");
+    node_table *table = create_table(8);
+    for (int i = 0; i < 200; i++)
+    {
+        node_id z = get_zero(table, i);
+        node *n = lookup(table, z);
+        assert(n->level == i);
+        assert(n->pop == 0);
+    }
+    TEST_OK("Zero node creation verified");
+}
+
 int main()
 {
-    //test_init();   
+    test_init();   
+    test_zeros();
     test_set_get();
     test_pattern();
-    test_advance();
     test_rle();
+    test_vacuum();
+    test_advance();
 
     /* timing tests */
     timing_table = create_table(131072);
     timing_pattern = read_rle(timing_table, "pat/rendell.rle");
+    
     timeit(time_next, "Advance pattern ", 500, 50, 7);
 
     timeit(time_advance_1, "Advance by 1", 500, 50, 7);
     timeit(time_advance_64, "Advance by 64", 500, 50, 7);
     timeit(time_advance_256, "Advance by 256", 500, 50, 7);
-    timeit(time_advance_65535, "Advance by 65535", 500, 50, 7);
+    timing_table = create_table(131072);
+    timing_pattern = read_rle(timing_table, "pat/rendell.rle");
+    
+    timeit(time_advance_65535, "Advance by 65535", 1, 1, 7);    
     timeit(time_advance_65536, "Advance by 65536", 500, 50, 7);
     timeit(load_rle_time, "Load Gosper glider gun RLE", 1000, 100, 7);
 
