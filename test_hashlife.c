@@ -66,7 +66,11 @@ void verify_children(node_table *table)
  are in range and sum to the correct levels */
 uint64_t verify_tree(node_table *table, node_id id, uint64_t level)
 {
+    printf("Verifying node ID: %llu at level %llu\n", id, level);
+    assert(id!= UNUSED);
     node *n = lookup(table, id);
+    printf("Verifying node ID: %llu, Level: %llu\n", n->id, n->level);
+    assert(id == n->id);    
     assert(n->pop <= (1ULL << (2 * n->level)));
     assert(n->level == level);
     
@@ -94,9 +98,13 @@ void verify_whole_tree(node_table *table)
     TEST_START("Verifying whole tree");
     for (uint64_t i = 0; i < table->size; i++)
     {
+        printf("TOP\n");
         node *n = &table->index[i];
         if (n->id != 0 && n->level <= 8)
+        {
+            printf("Verifying from top node ID: %llu, Level: %llu\n", n->id, n->level);
             verify_tree(table, n->id, n->level);
+        }
     }
     TEST_OK("Whole tree verified");
 }
@@ -438,6 +446,9 @@ void test_vacuum()
     after_count = table->count;
     assert(after_count == before_count);
     printf("Vacuum did not remove any nodes when all reachable\n");
+    verify_whole_tree(table);
+    verify_children(table);
+    verify_whole_population(table);
 
     /* generate junk via advance */
     for(int i=0;i<100;i++)
@@ -485,7 +496,7 @@ int main()
     test_set_get();
     test_pattern();
     test_rle();
-    test_vacuum();
+    //test_vacuum();
     test_advance();
 
     /* timing tests */

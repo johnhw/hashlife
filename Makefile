@@ -2,9 +2,9 @@ CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -pedantic 
 CFLAGS_DEBUG = -g -DDEBUG  -fstack-protector-strong -fno-omit-frame-pointer
 CFLAGS_OPT = -O4 -DNDEBUG -pg 
-CFLAGS += $(CFLAGS_OPT)
+CFLAGS += $(CFLAGS_DEBUG)
 TARGET = test_hashlife
-OBJS = test_hashlife.o hashlifemod.o cell_io.o timeit.o
+OBJS = test_hashlife.o hashlife.o cell_io.o timeit.o
 
 MIN_SRCS = min_hashlife.c cell_io.c main.c
 MIN_OBJS = $(MIN_SRCS:.c=.o)
@@ -19,8 +19,8 @@ $(TARGET): $(OBJS)
 test_hashlife.o: test_hashlife.c
 	$(CC) $(CFLAGS) -c test_hashlife.c
 
-hashlifemod.o: hashlifemod.c
-	$(CC) $(CFLAGS) -c hashlifemod.c
+hashlife.o: hashlife.c
+	$(CC) $(CFLAGS) -c hashlife.c
 
 cell_io.o: cell_io.c
 	$(CC) $(CFLAGS) -c cell_io.c
