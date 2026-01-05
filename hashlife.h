@@ -10,7 +10,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define INIT_TABLE_SIZE 4096
 #define ZERO_CACHE_MAX_SIZE 256
-#define MAX_J_CACHE 64
+#define MAX_J_CACHE 16
 
 typedef uint64_t node_id;
 
@@ -31,13 +31,12 @@ typedef struct node
 typedef struct node_table
 {
     node *index;
-    uint64_t time;
-    uint64_t size;
-    uint64_t count;
-    uint64_t mask;
+    uint64_t time;  // current time for LRU
+    uint64_t size;  // number of slots (always a power of 2)
+    uint64_t count; // number of allocated slots
+    uint64_t mask; // 2^n - 1 for indexing
     node_id on, off;                   // base on and off nodes
-    node_id zeros[ZERO_CACHE_MAX_SIZE]; // all zero nodes up to max size
-    
+    node_id zeros[ZERO_CACHE_MAX_SIZE]; // all zero nodes up to max size    
 } node_table;
 
 /* Hash functions */

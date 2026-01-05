@@ -1,7 +1,13 @@
 CC = gcc
-CFLAGS = -O4 -Wall -Wextra -std=c11 -pedantic -DNDEBUG
+CFLAGS = -Wall -Wextra -std=c11 -pedantic 
+CFLAGS_DEBUG = -g -DDEBUG -pg
+CFLAGS_OPT = -O4 -DNDEBUG -pg 
+CFLAGS += $(CFLAGS_OPT)
 TARGET = test_hashlife
 OBJS = test_hashlife.o hashlife.o cell_io.o timeit.o
+
+MIN_SRCS = min_hashlife.c cell_io.c main.c
+MIN_OBJS = $(MIN_SRCS:.c=.o)
 
 .PHONY: all clean
 
@@ -22,5 +28,12 @@ cell_io.o: cell_io.c
 timeit.o: timeit.c
 	$(CC) $(CFLAGS) -c timeit.c
 
+min: $(MIN_OBJS)
+	$(CC) $(CFLAGS_DEBUG) -o min_hashlife $(MIN_OBJS)	
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
 clean:
 	rm -f $(TARGET) $(OBJS)
+

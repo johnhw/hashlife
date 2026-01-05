@@ -4,16 +4,12 @@
     Design:
     - All nodes are referenced by an opaque identifier.
     - There is an *intern index* that maps from identifiers to pointers to nodes.
-    - It matches on (level, a, b, c, d) to ensure uniqueness.
+    - It matches on (a, b, c, d) to ensure uniqueness.
     - Nodes are reference counted.
 
 */
 #include "hashlife.h"
 
-uint64_t make_index(uint32_t generation, uint32_t index)
-{
-    return ((uint64_t)generation << 32) | index;
-}
 
 /* SplitMix64 mixing function */
 uint64_t mix64(uint64_t x)
@@ -225,14 +221,13 @@ static inline node_id sucjoin(node_table *table, node_id a, node_id b, node_id c
     return next(table, join(table, a, b, c, d), j);
 }
 
-
-
 /* Find the successor of the given node, 2^level-2 steps in the future */
 node_id successor(node_table *table, node_id id, uint64_t j)
 {
     node *n = lookup(table, id);
     if (n->pop == 0)
         return n->a;
+
     // store the node locally to ensure it does not change during processing
     node ncopy;
     ncopy = *n;
@@ -284,7 +279,7 @@ node_id next(node_table *table, node_id id, uint64_t j)
     node *n = lookup(table, id);
     if(n->pop==0)
         return n->a;
-
+    
     uint64_t level = n->level;
     if (j == 0 || j >= level - 2)
     {

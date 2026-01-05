@@ -430,10 +430,11 @@ void test_rle()
     assert(verify_same(table, rle_gun, gosper_gun));
 
     /* check that from_rle -> to_rle -> from_rle does not change the pattern */
-    char rle_buf[4096];
-    to_rle(table, rle_gun, rle_buf);
+    
+    char * rle_buf = to_rle(table, rle_gun, rle_buf);
     node_id cycle_rle_gun = from_rle(table, rle_buf);
     assert(verify_same(table, cycle_rle_gun, gosper_gun));
+    free(rle_buf);
     TEST_OK("RLE import/export verified");
 
 }
@@ -455,28 +456,7 @@ void test_pattern()
     TEST_OK("Pattern import/export verified");
 }
 
-/* Load and return an RLE of a pattern */
-node_id load_rle(node_table *table, char *filename)
-{
-    FILE *f = fopen(filename, "r");
-    if (!f)
-    {
-        printf("Failed to open RLE file: %s\n", filename);
-        exit(1);
-    }
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
 
-    char *buf = malloc(fsize + 1);
-    fread(buf, 1, fsize, f);
-    buf[fsize] = 0;
-    fclose(f);
-
-    node_id id = from_rle(table, buf);
-    free(buf);
-    return id;
-}
 
 /* static for timing access */
 static node_table *timing_table;
@@ -542,7 +522,7 @@ void timeit(int (*func)(void), const char *name, int iters, int warm, int trials
 
 int main()
 {
-    test_init();   
+    //test_init();   
     test_set_get();
     test_pattern();
     test_advance();

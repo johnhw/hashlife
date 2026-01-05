@@ -1,4 +1,5 @@
 #include "hashlife.h"
+#include <string.h>
 
 /* Read a .* style plain text pattern
     and return the corresponding hashlife node
@@ -180,8 +181,10 @@ node_id from_rle(node_table *table, char *rle_str)
     Take a hashlife node and output an RLE string into the given buffer.
     The buffer must be large enough to hold the output.
 */
-void to_rle(node_table *table, node_id id, char *buf)
+char *to_rle(node_table *table, node_id id)
 {
+    uint64_t bufsize = 4096;
+    char *buf = malloc(bufsize);    
     char *p = buf;
     uint64_t size = 1ULL << lookup(table, id)->level;
     uint64_t count;
@@ -224,7 +227,54 @@ void to_rle(node_table *table, node_id id, char *buf)
         }
         // line end
         p += sprintf(p, "$");
+        if( (p - buf) + 256 >= bufsize)
+        {
+            // expand buffer
+            uint64_t offset = p - buf;
+            bufsize *= 2;
+            buf = realloc(buf, bufsize);
+            p = buf + offset;
+        }
     }
     // end marker
     sprintf(p, "!");
+    return buf;
+}
+
+/* Load and return an RLE of a pattern */
+node_id read_rle(node_table *table, char *filename)
+{
+    FILE *f = fopen(filename, "r");
+    if (!f)
+    {
+        printf("Failed to open RLE file: %s\n", filename);
+        exit(1);
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char *buf = malloc(fsize + 1);
+    fread(buf, 1, fsize, f);
+    buf[fsize] = 0;
+    fclose(f);
+
+    node_id id = from_rle(table, buf);
+    free(buf);
+    return id;
+}
+
+int write_rle(node_table *node_table, node_id node, char *filename)
+{
+    FILE *f = fopen(filename, "w");
+    if (!f)
+    {
+        printf("Failed to open RLE file for writing: %s\n", filename);
+        return 1;
+    }
+    char *buf = to_rle(node_table, node);
+    fwrite(buf, 1, strlen(buf), f);
+    free(buf);
+    fclose(f);
+    return 0;
 }
