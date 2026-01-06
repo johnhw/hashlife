@@ -208,21 +208,21 @@ node_id successor(node_table *table, node_id id, uint64_t j)
     /* Not the natural successor; combine parts */
     if (j < level - 2)
     {
-        node *c1n = lookup(table, c1);
-        node *c2n = lookup(table, c2);
-        node *c3n = lookup(table, c3);
-        node *c4n = lookup(table, c4);
-        node *c5n = lookup(table, c5);
-        node *c6n = lookup(table, c6);
-        node *c7n = lookup(table, c7);
-        node *c8n = lookup(table, c8);
-        node *c9n = lookup(table, c9);
+        node c1n = *lookup(table, c1);
+        node c2n = *lookup(table, c2);
+        node c3n = *lookup(table, c3);
+        node c4n = *lookup(table, c4);
+        node c5n = *lookup(table, c5);
+        node c6n = *lookup(table, c6);
+        node c7n = *lookup(table, c7);
+        node c8n = *lookup(table, c8);
+        node c9n = *lookup(table, c9);
 
         next = join(table,
-                    join(table, c1n->d, c2n->c, c4n->b, c5n->a),
-                    join(table, c2n->d, c3n->c, c5n->b, c6n->a),
-                    join(table, c4n->d, c5n->c, c7n->b, c8n->a),
-                    join(table, c5n->d, c6n->c, c8n->b, c9n->a));
+                    join(table, c1n.d, c2n.c, c4n.b, c5n.a),
+                    join(table, c2n.d, c3n.c, c5n.b, c6n.a),
+                    join(table, c4n.d, c5n.c, c7n.b, c8n.a),
+                    join(table, c5n.d, c6n.c, c8n.b, c9n.a));
         cache_next(table, id, next, j);
         return next;
     }
@@ -256,19 +256,13 @@ node_id advance(node_table *table, node_id id, uint64_t steps)
         id = centre(table, id);
         n = lookup(table, id);
     }
-
     // pad to the centre
     id = centre(table, id);
     n = lookup(table, id);
-
-    uint64_t j = 1;
-    while (steps > 0)
-    {
+    // advance by 2^j on each set bit j
+    for(uint64_t j=1; steps>0; j++, steps>>=1)
         if (steps & 1)
             id = centre(table, successor(table, id, j));
-        j++;
-        steps >>= 1;
-    }
     // crop for the caller
     return crop(table, id);
 }
@@ -276,7 +270,7 @@ node_id advance(node_table *table, node_id id, uint64_t steps)
 /* Compute the life rule on the 3x3 neighbourhood
 
     a b c
-    d e f
+    d E f
     g h i
 
     Returns either the hash of the "on" (=2) or "off" (=1) base node.
@@ -290,8 +284,7 @@ node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id
 
 node_id life_4x4(node_table *table, node_id id)
 {
-    node *n = lookup(table, id);
-    
+    node *n = lookup(table, id);    
     node_id na, nb, nc, nd;
     node *a = lookup(table, n->a);
     node *b = lookup(table, n->b);
@@ -326,7 +319,7 @@ void vacuum(node_table *table, node_id top)
     for(uint64_t i=0; i<table->size; i++)
     {
         node *n = &table->index[i];
-        if(n->level > 2 && n->pop!=0 && n->id != UNUSED && !(n->level & 0x8000000000000000ULL))
+        if(n->level > 2 && n->id != UNUSED && !(n->level & 0x8000000000000000ULL))
         {
             // unmarked node, delete it
             n->id = UNUSED;
@@ -340,6 +333,8 @@ void vacuum(node_table *table, node_id top)
 node_table *create_table(uint64_t initial_size)
 {
     node_table *table = (node_table *)malloc(sizeof(node_table));
+    if(initial_size < 16)
+        initial_size = 16;
     table->size = initial_size;
     table->count = 0;
     table->index = (node *)calloc(table->size, sizeof(node));    

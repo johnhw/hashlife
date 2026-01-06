@@ -183,12 +183,12 @@ node_id from_rle(node_table *table, char *rle_str)
 */
 char *to_rle(node_table *table, node_id id)
 {
-    uint64_t bufsize = 4096;
+    int bufsize = 4096;
     char *buf = malloc(bufsize);    
     char *p = buf;
     uint64_t size = 1ULL << lookup(table, id)->level;
     uint64_t count;
-    p += sprintf(p, "x=%llu,y=%llu, rule = B3/S23\n", size, size);
+    p += sprintf(p, "x=%lu,y=%lu, rule = B3/S23\n", size, size);
 
     float cell_value;
     for (uint64_t y = 0; y < size; y++)

@@ -1,3 +1,5 @@
 *.o
 *.exe
 *.out
+test_hashlife
+*.log

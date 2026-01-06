@@ -66,10 +66,8 @@ void verify_children(node_table *table)
  are in range and sum to the correct levels */
 uint64_t verify_tree(node_table *table, node_id id, uint64_t level)
 {
-    printf("Verifying node ID: %llu at level %llu\n", id, level);
     assert(id!= UNUSED);
     node *n = lookup(table, id);
-    printf("Verifying node ID: %llu, Level: %llu\n", n->id, n->level);
     assert(id == n->id);    
     assert(n->pop <= (1ULL << (2 * n->level)));
     assert(n->level == level);
@@ -98,11 +96,10 @@ void verify_whole_tree(node_table *table)
     TEST_START("Verifying whole tree");
     for (uint64_t i = 0; i < table->size; i++)
     {
-        printf("TOP\n");
         node *n = &table->index[i];
         if (n->id != 0 && n->level <= 8)
         {
-            printf("Verifying from top node ID: %llu, Level: %llu\n", n->id, n->level);
+            
             verify_tree(table, n->id, n->level);
         }
     }
@@ -147,7 +144,7 @@ void test_inner(node_table *table, node_id id)
 void print_node(node_table *table, node_id id)
 {
     node *n = lookup(table, id);
-    printf("Node ID: %llu, Level: %llu, Pop: %llu, Children: [%llu, %llu, %llu, %llu]\n", n->id, n->level, n->pop, n->a, n->b, n->c, n->d);
+    printf("Node ID: %lu, Level: %lu, Pop: %lu, Children: [%lu, %lu, %lu, %lu]\n", n->id, n->level, n->pop, n->a, n->b, n->c, n->d);
 }
 
 void test_init()
@@ -155,8 +152,8 @@ void test_init()
     TEST_START("Testing table initialisation...");
     // force expansions
     node_table *table = create_table(131072);
-    printf("Table has %llu entries\n", table->count);
-    printf("Table size: %llu\n", table->size);
+    printf("Table has %lu entries\n", table->count);
+    printf("Table size: %lu\n", table->size);
     assert(table != NULL);
     printf("Table was not NULL\n");
     node *on, *off;
@@ -268,7 +265,7 @@ void print_table_stats(node_table *table)
         if (n->id != 0)
             used++;
     }
-    printf("Hashtable usage: %llu / %llu (%.2f%%)\n", used, table->size, (used * 100.0) / table->size);
+    printf("Hashtable usage: %lu / %lu (%.2f%%)\n", used, table->size, (used * 100.0) / table->size);
 }
 
 void test_gun()
@@ -479,7 +476,7 @@ void test_zeros()
 {
     TEST_START("Testing zero node creation");
     node_table *table = create_table(8);
-    for (int i = 0; i < 200; i++)
+    for (uint64_t i = 0; i < 200; i++)
     {
         node_id z = get_zero(table, i);
         node *n = lookup(table, z);
