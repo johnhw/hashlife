@@ -1,11 +1,9 @@
 /*
-    Hashlife.
+    An implementation of HashLife
+    A conversion of the Python version at https://github.com/johnhw/hashlife
 
-    Design:
-    - All nodes are referenced by an opaque identifier.
-    - There is an *intern index* that maps from identifiers to pointers to nodes.
-    - It matches on (a, b, c, d) to ensure uniqueness.
-    - Nodes are reference counted.
+    John H. Williamson, 2026    
+    MIT License
 
 */
 #include "hashlife.h"
@@ -35,6 +33,9 @@ uint64_t hash_quad(const uint64_t a, const uint64_t b, const uint64_t c, const u
     return mix64(h);
 }
 
+/*  One attempt lookup in the successor cache 
+    (no probing, collisions cause recomputation)
+*/
 node_id lookup_next(node_table *table, node_id from, uint64_t j)
 {
     uint64_t mask = (table->size) - 1;
@@ -45,6 +46,9 @@ node_id lookup_next(node_table *table, node_id from, uint64_t j)
     return UNUSED;
 }
 
+/* Cache the successor result, 
+    kicking out any existing entry.
+*/
 void cache_next(node_table *table, node_id from, node_id to, uint64_t j)
 {
     uint64_t mask = (table->size) - 1;
@@ -88,15 +92,9 @@ node *lookup(node_table *table, node_id id)
     uint64_t index = id & mask;
     node *n = &table->index[index];
     while (n->id != UNUSED && n->id != id)
-    {
-        // linear probing
-        index = (index + 1) & mask;
-        n = &table->index[index];    
-    }    
-    
+        n = &table->index[index++ & mask];                
     return n;
 }
-
 
 
 /* Double the size of the table, reinserting nodes */
@@ -107,6 +105,7 @@ void resize_table(node_table *table)
     uint64_t new_mask = new_size - 1;
     uint64_t new_index_pos;
     node *old_n;
+
     for (uint64_t i = 0; i < table->size; i++)
     {
         old_n = &table->index[i];
@@ -139,7 +138,7 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
     while (n->id != UNUSED)
     {
         if (n->a == a_hash && n->b == b_hash && n->c == c_hash && n->d == d_hash)
-            return n->id;   // found it
+            return n->id;   // found it        
         hash = mix64(hash); // doppleganger, create a new unique id
         n = lookup(table, hash);
     }
@@ -182,11 +181,17 @@ node_id successor(node_table *table, node_id id, uint64_t j)
         j = level - 2;        
     if (n->pop == 0) // empty
         return n->a;
-    if (level == 2) // base case
-        return life_4x4(table, id);    
+
     node_id next = lookup_next(table, id, j);
     if(next != UNUSED) // cached
         return next;    
+
+    if (level == 2) // base case
+    {        
+        next = life_4x4(table, id);    
+        cache_next(table, id, next, j);
+        return next;
+    }
 
     node_id c1, c2, c3, c4, c5, c6, c7, c8, c9;
     // copy the actual nodes to prevent changes during lookups
@@ -332,17 +337,13 @@ void vacuum(node_table *table, node_id top)
 
 node_table *create_table(uint64_t initial_size)
 {
-    node_table *table = (node_table *)malloc(sizeof(node_table));
-    if(initial_size < 16)
-        initial_size = 16;
-    table->size = initial_size;
-    table->count = 0;
+    node_table *table = (node_table *)malloc(sizeof(node_table));    
+    table->size = initial_size < 16 ? 16 : initial_size;    
     table->index = (node *)calloc(table->size, sizeof(node));    
     /* cell level nodes */
     table->index[1] = (node){.level = 0, .a = 0, .b = 0, .c = 0, .d = 0, .pop = 0, .id = OFF}; // off node
     table->index[2] = (node){.level = 0, .a = 0, .b = 0, .c = 0, .d = 0, .pop = 1, .id = ON}; // on node
     table->count = 2;    
-    
     return table;
 }
 
@@ -407,7 +408,6 @@ node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool sta
         else
             return OFF;
     }
-
     // expand the node until x < 1<< (level-1) and y < 1 << (level-1)
     while (x >= (1ULL << n->level) || y >= (1ULL << n->level))
     {

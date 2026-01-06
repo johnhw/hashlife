@@ -6,7 +6,7 @@
 */
 node_id from_text(node_table *table, char *txt)
 {
-    node_id root = get_zero(table, 2); 
+    node_id root = get_zero(table, 2);
     uint64_t x = 0, y = 0;
     char *p = txt;
     while (*p)
@@ -162,8 +162,8 @@ node_id from_rle(node_table *table, char *rle_str)
             for (int i = 0; i < count; i++)
             {
                 root = set_cell(table, root, x, y, true);
-                
-                x++;                
+
+                x++;
                 pop++;
             }
         }
@@ -173,7 +173,7 @@ node_id from_rle(node_table *table, char *rle_str)
             x = 0;
         }
     }
-    
+
     return root;
 }
 
@@ -184,11 +184,11 @@ node_id from_rle(node_table *table, char *rle_str)
 char *to_rle(node_table *table, node_id id)
 {
     int bufsize = 4096;
-    char *buf = malloc(bufsize);    
+    char *buf = malloc(bufsize);
     char *p = buf;
     uint64_t size = 1ULL << lookup(table, id)->level;
     uint64_t count;
-    p += sprintf(p, "x=%lu,y=%lu, rule = B3/S23\n", size, size);
+    p += sprintf(p, "x=%llu,y=%llu, rule = B3/S23\n", size, size);
 
     float cell_value;
     for (uint64_t y = 0; y < size; y++)
@@ -227,7 +227,7 @@ char *to_rle(node_table *table, node_id id)
         }
         // line end
         p += sprintf(p, "$");
-        if( (p - buf) + 256 >= bufsize)
+        if ((p - buf) + 256 >= bufsize)
         {
             // expand buffer
             uint64_t offset = p - buf;

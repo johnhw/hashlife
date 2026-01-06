@@ -63,7 +63,7 @@ typedef struct node
 
 typedef struct node_table
 {
-    node *index;      
+    node *index;          
     uint64_t size;  // number of slots (always a power of 2)
     uint64_t count; // number of allocated slots            
 } node_table;
