@@ -2,7 +2,7 @@
 
 Python Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](https://johnhw.github.io/hashlife/index.md.html) for a full explanation.
 
-*An equivalent plain ISO C implementation of the Python code is available in [c/](c/)*
+*An equivalent plain ISO C implementation of the Python code is available in [iso-c/](iso-c/)*
 
 Usage:
 
@@ -22,7 +22,7 @@ render_img(pts) # render as image
 
 ## C implementation
 
-See [c/README.md](c/README.md) for details.
+See [iso-c/README.md](iso-c/README.md) for details.
 
 ## Credits
 
