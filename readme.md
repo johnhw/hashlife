@@ -8,7 +8,13 @@ This is written to be equivalent to the Python version. It is designed for clari
 make
 ```
 
-will build `hashlife`. To build the tests, `make test` then `./test_hashlife`.
+will build `hashlife`.
+
+To build and run the tests, 
+```
+make test
+./test_hashlife
+```
 
 ## Usage
 
