@@ -270,6 +270,21 @@ node_id advance(node_table *table, node_id id, uint64_t steps)
             id = centre(table, successor(table, id, j));
     // crop for the caller
     return crop(table, id);
+    
+}
+
+
+/* Fast forward by repeated application of the HashLife step */
+node_id ffwd(node_table *table, node_id id, uint64_t steps, uint64_t *generations)
+{
+    *generations = 0;
+    for(uint64_t i=0;i<steps;i++)
+    {
+        id = centre(table, centre(table, pad(table, id)));
+        id = successor(table, id, 0);
+        *generations += 1ULL << (lookup(table, id)->level - 2);
+    }
+    return crop(table, id);
 }
 
 /* Compute the life rule on the 3x3 neighbourhood

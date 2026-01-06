@@ -476,6 +476,17 @@ void test_zeros()
     TEST_OK("Zero node creation verified");
 }
 
+void test_ffwd()
+{
+    TEST_START("Testing fast forward function");
+    node_table *table = create_table(1<<24);
+    node_id breeder = read_rle(table, "pat/breeder.rle");
+    uint64_t generations = 0;
+    node_id future = ffwd(table, breeder, 48, &generations);
+    printf("Fast forwarded breeder by %llu generations, population %llu\n", generations, lookup(table, future)->pop);
+    TEST_OK("Fast forward function verified");
+}
+
 int main()
 {
     test_init();
@@ -485,6 +496,7 @@ int main()
     test_rle();
     test_vacuum();
     test_advance();
+    test_ffwd();
 
     /* timing tests */
     timing_table = create_table(131072);

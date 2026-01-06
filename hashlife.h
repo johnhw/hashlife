@@ -91,6 +91,7 @@ bool is_padded(node_table *table, node_id id);
 node_id crop(node_table *table, node_id id);
 node_id pad(node_table *table, node_id id);
 node_id successor(node_table *table, node_id id, uint64_t j);
+node_id ffwd(node_table *table, node_id id, uint64_t steps, uint64_t *generations);
 
 /* Cell access */
 node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool state);

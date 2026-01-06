@@ -3,13 +3,11 @@ CFLAGS = -Wall -Wextra -std=c11 -pedantic
 CFLAGS_DEBUG = -g
 CFLAGS_OPT = -O4 -DNDEBUG
 CFLAGS += $(CFLAGS_DEBUG)
-TARGET = test_hashlife
-OBJS = test_hashlife.o hashlife.o cell_io.o timeit.o
-
 
 .PHONY: all clean
 
-test: $(TARGET)
+all: hashlife  # Set default target to hashlife
+
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
@@ -25,6 +23,16 @@ cell_io.o: cell_io.c
 	
 timeit.o: timeit.c
 	$(CC) $(CFLAGS) -c timeit.c
+
+
+hashlife: main.o hashlife.o cell_io.o timeit.o
+	$(CC) $(CFLAGS) -o hashlife main.o hashlife.o cell_io.o timeit.o
+
+test: test_hashlife.o hashlife.o cell_io.o timeit.o
+	$(CC) $(CFLAGS) -o test_hashlife test_hashlife.o hashlife.o cell_io.o timeit.o
+
+main.o: main.c
+	$(CC) $(CFLAGS) -c main.c
 
 
 %.o: %.c
