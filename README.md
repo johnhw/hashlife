@@ -1,6 +1,8 @@
 <img src="imgs/header.png" width="50%">
 
-Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](https://johnhw.github.io/hashlife/index.md.html) for a full explanation.
+Python Implementation of Gosper's hashlife algorithm. See [johnhw.github.io/hashlife](https://johnhw.github.io/hashlife/index.md.html) for a full explanation.
+
+*An equivalent plain ISO C implementation of the Python code is available in [c/](c/)*
 
 Usage:
 
@@ -17,6 +19,10 @@ render_img(pts) # render as image
 ```
 
 <img src="imgs/gun30_30.png">
+
+## C implementation
+
+See [c/README.md](c/README.md) for details.
 
 ## Credits
 
