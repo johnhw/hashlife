@@ -18,7 +18,7 @@ uint64_t mix64(uint64_t x)
 }
 
 /* Hash four values into one */
-uint64_t hash_quad(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d)
+uint64_t hash_quad(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
 {
     uint64_t h = 0x243f6a8885a308d3ULL;
     h ^= mix64(a + 0x9e3779b97f4a7c15ULL * 1);
@@ -65,8 +65,7 @@ node_id centre(node_table *table, node_id m_h)
 {
     node_id z;
     node m = *lookup(table, m_h);
-
-    z = get_zero(table, m.level - 1);
+    z = get_zero(table, LEVEL(m_h) - 1);
     node_id a = join(table, z, z, z, m.a);
     node_id b = join(table, z, z, m.b, z);
     node_id c = join(table, z, m.c, z, z);
@@ -77,17 +76,20 @@ node_id centre(node_table *table, node_id m_h)
 /* Return the zero node of the given size */
 node_id get_zero(node_table *table, uint64_t k)
 {
-    node_id z = OFF;
-    for (uint64_t i = 0; i < k; i++)
-        z = join(table, z, z, z, z);
-    return z;
+    if (k == 0)
+        return table->off;
+    // Try the systematic name for a zero first
+    node_id z = (0ULL << 63) | (1ULL << 62) | (k << 46) | (HASH_MASK(mix64(k)));
+    if (lookup(table, z)->id == z)
+        return z;
+    return join(table, get_zero(table, k - 1), get_zero(table, k - 1), get_zero(table, k - 1), get_zero(table, k - 1));
 }
 
 node *lookup(node_table *table, node_id id)
 {
     uint64_t mask = table->size - 1;
-    uint64_t index = id & mask;
-    node *n = &table->index[index];
+    uint64_t index = id;
+    node *n = &table->index[index & mask];
     while (n->id != UNUSED && n->id != id)
         n = &table->index[index++ & mask];
     return n;
@@ -119,6 +121,20 @@ void resize_table(node_table *table)
     table->size = new_size;
 }
 
+/* Given four node_ids, compute the parent node ID */
+uint64_t merge(node_id a, node_id b, node_id c, node_id d)
+{
+    // format: [flag:1] [zero:1] [level:16] [hash:46]
+    uint64_t h = hash_quad(a, b, c, d);
+    // extract level bits from a
+    uint64_t level = ((a >> 46) + 1) & 0xFFFF;
+    uint64_t all_zero = IS_ZERO(a) && IS_ZERO(b) && IS_ZERO(c) && IS_ZERO(d);
+    if (all_zero)
+        return (0ULL << 63) | (1ULL << 62) | (level << 46) | (HASH_MASK(mix64(level)));
+    else
+        return (0ULL << 63) | (0ULL << 62) | (level << 46) | (HASH_MASK(h));
+}
+
 /* Join four nodes.
    - If the node exists, return it from the table.
    - Otherwise, intern it.
@@ -128,13 +144,14 @@ void resize_table(node_table *table)
 
 node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, node_id d_hash)
 {
-    uint64_t hash = hash_quad(a_hash, b_hash, c_hash, d_hash);
+    uint64_t hash = merge(a_hash, b_hash, c_hash, d_hash);
     node *n = lookup(table, hash);
     while (n->id != UNUSED)
     {
         if (n->a == a_hash && n->b == b_hash && n->c == c_hash && n->d == d_hash)
-            return n->id;   // found it
-        hash = mix64(hash); // doppleganger, create a new unique id
+            return n->id;                // found it
+        uint64_t new_hash = mix64(hash); // doppleganger, create a new unique id
+        hash ^= HASH_MASK(new_hash);     // XOR in low 46 bits only
         n = lookup(table, hash);
     }
 
@@ -151,7 +168,6 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
     node *b = lookup(table, b_hash);
     node *c = lookup(table, c_hash);
     node *d = lookup(table, d_hash);
-    n->level = a->level + 1;
     n->pop = a->pop + b->pop + c->pop + d->pop;
     table->count++;
 
@@ -169,16 +185,17 @@ static inline node_id sucjoin(node_table *table, node_id a, node_id b, node_id c
 /* Find the successor of the given node, 2^level-2 steps in the future */
 node_id successor(node_table *table, node_id id, uint64_t j)
 {
-    node *n = lookup(table, id);
-    uint64_t level = n->level;
+
+    uint64_t level = LEVEL(id);
 
     if (j == 0 || j >= level - 2)
         j = level - 2;
-    if (n->pop == 0) // empty
-        return n->a;
+
+    if (IS_ZERO(id)) // empty
+        return lookup(table, id)->a;
 
     node_id next = lookup_next(table, id, j);
-    if (next != UNUSED) // cached
+    if (next != UNUSED)
         return next;
 
     if (level == 2) // base case
@@ -187,6 +204,8 @@ node_id successor(node_table *table, node_id id, uint64_t j)
         cache_next(table, id, next, j);
         return next;
     }
+
+    node *n = lookup(table, id);
 
     node_id c1, c2, c3, c4, c5, c6, c7, c8, c9;
     // copy the actual nodes to prevent changes during lookups
@@ -247,17 +266,11 @@ node_id successor(node_table *table, node_id id, uint64_t j)
 */
 node_id advance(node_table *table, node_id id, uint64_t steps)
 {
-    node *n = lookup(table, id);
     // ensure the node is big enough; n->level must be > log2(steps)+2
-    while ((1ULL << (n->level - 2)) < steps)
-    {
-        // pad the node
+    while ((1ULL << (LEVEL(id) - 2)) < steps)
         id = centre(table, id);
-        n = lookup(table, id);
-    }
     // pad to the centre
     id = centre(table, id);
-    n = lookup(table, id);
     // advance by 2^j on each set bit j
     for (uint64_t j = 1; steps > 0; j++, steps >>= 1)
         if (steps & 1)
@@ -274,7 +287,7 @@ node_id ffwd(node_table *table, node_id id, uint64_t steps, uint64_t *generation
     {
         id = centre(table, centre(table, pad(table, id)));
         id = successor(table, id, 0);
-        *generations += 1ULL << (lookup(table, id)->level - 2);
+        *generations += 1ULL << (LEVEL(id) - 2);
     }
     return crop(table, id);
 }
@@ -287,9 +300,9 @@ node_id ffwd(node_table *table, node_id id, uint64_t steps, uint64_t *generation
 
     Returns either the hash of the "on" (=2) or "off" (=1) base node.
 */
-node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i)
+node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i, node_id ON, node_id OFF)
 {
-    /* hash 1 = off, hash 2 = on, by definition*/
+
     int pop_sum = (a == ON) + (b == ON) + (c == ON) + (d == ON) + (f == ON) + (g == ON) + (h == ON) + (i == ON);
     return (pop_sum == 3 || (pop_sum == 2 && e == ON)) ? ON : OFF;
 }
@@ -302,21 +315,25 @@ node_id life_4x4(node_table *table, node_id id)
     node *b = lookup(table, n->b);
     node *c = lookup(table, n->c);
     node *d = lookup(table, n->d);
-    na = base_life(a->a, a->b, b->a, a->c, a->d, b->c, c->a, c->b, d->a);
-    nb = base_life(a->b, b->a, b->b, a->d, b->c, b->d, c->b, d->a, d->b);
-    nc = base_life(a->c, a->d, b->c, c->a, c->b, d->a, c->c, c->d, d->c);
-    nd = base_life(a->d, b->c, b->d, c->b, d->a, d->b, c->d, d->c, d->d);
+    uint64_t on = table->on;
+    uint64_t off = table->off;
+    na = base_life(a->a, a->b, b->a, a->c, a->d, b->c, c->a, c->b, d->a, on, off);
+    nb = base_life(a->b, b->a, b->b, a->d, b->c, b->d, c->b, d->a, d->b, on, off);
+    nc = base_life(a->c, a->d, b->c, c->a, c->b, d->a, c->c, c->d, d->c, on, off);
+    nd = base_life(a->d, b->c, b->d, c->b, d->a, d->b, c->d, d->c, d->d, on, off);
     return join(table, na, nb, nc, nd);
 }
 
 /* Mark every child node, recursively */
 void set_flag(node_table *table, node_id id)
 {
-    node *n = lookup(table, id);
-    if (n->level <= 2)
+    if (LEVEL(id) <= 2)
         return;
-    // set the high bit of level
-    n->level = n->level | 0x8000000000000000ULL;
+    node *n = lookup(table, id);
+
+    // set the high bit of pop
+    n->pop = SET_MSB(n->pop);
+
     set_flag(table, n->a);
     set_flag(table, n->b);
     set_flag(table, n->c);
@@ -328,16 +345,39 @@ void vacuum(node_table *table, node_id top)
 {
     // walk the tree, marking all reachable nodes
     set_flag(table, top);
+    node *old_index = table->index;
+    table->index = (node *)calloc(table->size, sizeof(node));
+    table->count = 0;
     for (uint64_t i = 0; i < table->size; i++)
     {
-        node *n = &table->index[i];
-        if (n->level > 2 && n->id != UNUSED && !(n->level & 0x8000000000000000ULL))
+        node *n = &old_index[i];                
+        if (n->id != UNUSED && (LEVEL(n->id) <= 2 || TEST_MSB(n->pop)))
+        {            
+            node *slot = lookup(table, n->id);
+            n->pop = CLEAR_MSB(n->pop);
+            assert(slot->id == UNUSED); // should not already exist
+            *slot = *n;            
+            table->count++;
+        }        
+    }
+    /* now clear up the successor cache */
+    for (uint64_t i = 0; i < table->size; i++)
+    {
+        node *n = &table->index[i];        
+        /* 
+        check; are we mapping to a successor? 
+        make sure that successor actually still exists! 
+        */
+        if (n->to != UNUSED)
         {
-            // unmarked node, delete it
-            n->id = UNUSED;
-            table->count--;
+            if (lookup(table, n->to)->id != n->to)
+            {
+                // invalid node, delete it
+                n->from = UNUSED;
+                n->to = UNUSED;
+                n->j = 0;
+            }
         }
-        n->level = n->level & 0x7FFFFFFFFFFFFFFFULL; // clear the mark bit
     }
 }
 
@@ -346,9 +386,13 @@ node_table *create_table(uint64_t initial_size)
     node_table *table = (node_table *)malloc(sizeof(node_table));
     table->size = initial_size < 16 ? 16 : initial_size;
     table->index = (node *)calloc(table->size, sizeof(node));
+    table->off = (0ULL << 63) | (1ULL << 62) | (0ULL << 46) | HASH_MASK(mix64(0));
+    table->on = (0ULL << 63) | (0ULL << 62) | (0ULL << 46) | HASH_MASK(mix64(1));
+
+    uint64_t mask = table->size - 1;
     /* cell level nodes */
-    table->index[1] = (node){.level = 0, .a = 0, .b = 0, .c = 0, .d = 0, .pop = 0, .id = OFF}; // off node
-    table->index[2] = (node){.level = 0, .a = 0, .b = 0, .c = 0, .d = 0, .pop = 1, .id = ON};  // on node
+    table->index[(table->off) & mask] = (node){.a = 0, .b = 0, .c = 0, .d = 0, .pop = 0, .id = table->off}; // off node
+    table->index[(table->on) & mask] = (node){.a = 0, .b = 0, .c = 0, .d = 0, .pop = 1, .id = table->on};   // on node
     table->count = 2;
     return table;
 }
@@ -368,61 +412,52 @@ node_id inner(node_table *table, node_id id)
 bool is_padded(node_table *table, node_id id)
 {
     node *n = lookup(table, id);
-    node a = *lookup(table, n->a);
-    node b = *lookup(table, n->b);
-    node c = *lookup(table, n->c);
-    node d = *lookup(table, n->d);
-    bool ad = a.pop == lookup(table, a.d)->pop;
-    bool bc = b.pop == lookup(table, b.c)->pop;
-    bool cb = c.pop == lookup(table, c.b)->pop;
-    bool da = d.pop == lookup(table, d.a)->pop;
+    node *a = lookup(table, n->a);
+    node *b = lookup(table, n->b);
+    node *c = lookup(table, n->c);
+    node *d = lookup(table, n->d);
+    bool ad = a->pop == lookup(table, a->d)->pop;
+    bool bc = b->pop == lookup(table, b->c)->pop;
+    bool cb = c->pop == lookup(table, c->b)->pop;
+    bool da = d->pop == lookup(table, d->a)->pop;
     return ad && bc && cb && da;
 }
 
 /* Repeatedly take the inner node, until no more can be removed */
 node_id crop(node_table *table, node_id id)
 {
-    node *n = lookup(table, id);
-    while (n->level > 3 && is_padded(table, id))
-    {
+    while (LEVEL(id) > 3 && is_padded(table, id))
         id = inner(table, id);
-        n = lookup(table, id);
-    }
     return id;
 }
 
 /* Repeatedly centre the node, until the node is fully padded */
 node_id pad(node_table *table, node_id id)
 {
-    node *n = lookup(table, id);
-    while (n->level < 3 || is_padded(table, id))
-    {
+    while (LEVEL(id) < 3 || is_padded(table, id))
         id = centre(table, id);
-        n = lookup(table, id);
-    }
     return id;
 }
 
 /* Set the cell at the given position, returning the new node */
 node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool state)
 {
-    node *n = lookup(table, id);
-    if (n->level == 0)
+
+    if (LEVEL(id) == 0)
     {
         if (state)
-            return ON;
+            return table->on;
         else
-            return OFF;
+            return table->off;
     }
     // expand the node until x < 1<< (level-1) and y < 1 << (level-1)
-    while (x >= (1ULL << n->level) || y >= (1ULL << n->level))
+    while (x >= (1ULL << LEVEL(id)) || y >= (1ULL << LEVEL(id)))
     {
-        node_id z = get_zero(table, n->level);
+        node_id z = get_zero(table, LEVEL(id));
         id = join(table, id, z, z, z);
-        n = lookup(table, id);
     }
-
-    uint64_t offset = 1 << (n->level - 1);
+    node *n = lookup(table, id);
+    uint64_t offset = 1 << (LEVEL(id) - 1);
     node_id a = n->a;
     node_id b = n->b;
     node_id c = n->c;
@@ -442,14 +477,15 @@ node_id set_cell(node_table *table, node_id id, uint64_t x, uint64_t y, bool sta
 float get_cell(node_table *table, node_id id, uint64_t x, uint64_t y, uint64_t level)
 {
     node *n = lookup(table, id);
-    if (n->level == 0 || n->level == level)
-        return n->pop / (float)(1 << (n->level * 2));
-    uint64_t size = 1 << n->level;
+    if (LEVEL(id) == 0 || LEVEL(id) == level)
+        return n->pop / (float)(1 << (2 * LEVEL(id)));
+    uint64_t size = 1 << LEVEL(id);
     // bounds test
     if (x >= size || y >= size)
         return 0.0f;
     // recursive descent
-    uint64_t offset = 1 << (n->level - 1);
+
+    uint64_t offset = 1 << (LEVEL(id) - 1);
     if (x < offset && y < offset)
         return get_cell(table, n->a, x, y, level);
     else if (x >= offset && y < offset)

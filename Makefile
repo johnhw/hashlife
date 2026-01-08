@@ -12,16 +12,16 @@ all: hashlife  # Set default target to hashlife
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-test_hashlife.o: test_hashlife.c
+test_hashlife.o: test_hashlife.c hashlife.h
 	$(CC) $(CFLAGS) -c test_hashlife.c
 
-hashlife.o: hashlife.c
+hashlife.o: hashlife.c hashlife.h
 	$(CC) $(CFLAGS) -c hashlife.c
 
-cell_io.o: cell_io.c
+cell_io.o: cell_io.c hashlife.h
 	$(CC) $(CFLAGS) -c cell_io.c
 	
-timeit.o: timeit.c
+timeit.o: timeit.c hashlife.h
 	$(CC) $(CFLAGS) -c timeit.c
 
 
@@ -31,7 +31,7 @@ hashlife: main.o hashlife.o cell_io.o timeit.o
 test: test_hashlife.o hashlife.o cell_io.o timeit.o
 	$(CC) $(CFLAGS) -o test_hashlife test_hashlife.o hashlife.o cell_io.o timeit.o
 
-main.o: main.c
+main.o: main.c hashlife.h
 	$(CC) $(CFLAGS) -c main.c
 
 

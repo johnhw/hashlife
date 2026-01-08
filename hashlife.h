@@ -11,20 +11,29 @@
 #define INIT_TABLE_SIZE 4096
 
 /* Stable, opaque ID for nodes */
+// IDs have a structured format: [mark:1] [zero:1] [level:16] [hash:46]
 typedef uint64_t node_id;
 static const node_id UNUSED = 0;
-static const node_id OFF = 1;
-static const node_id ON = 2;
+
+/* Define macros for setting, clearing, and testing the MSB of pop */
+#define SET_MSB(x) ((x) | (1ULL << 63))
+#define CLEAR_MSB(x) ((x) & ~(1ULL << 63))
+#define TEST_MSB(x) (((x) >> 63) & 1)
 
 
-/* Node entries 
+#define LEVEL(node) (((node) >> 46) & 0xFFFFULL)
+#define IS_ZERO(node) (((node) >> 62) & 0x1ULL)
+#define IS_MARKED(node) (((node) >> 63) & 0x1ULL)
+#define HASH_MASK(node) ((node) & 0x3FFFFFFFFFFFULL)
+
+/* Node entries
 
 This is two hashtables "layered" into one.
 This avoids maintaining two separate tables, and keeps
 everything in one allocation.
 
 -- Node level --
-The main table maps id -> (a,b,c,d,level,pop). 
+The main table maps id -> (a,b,c,d,level,pop).
 It auto-expands to maintain a load factor <= 0.25, reinserting all entries on expansion.
 
 ids are guaranteed stable, pointers to nodes are not.
@@ -32,12 +41,12 @@ ids are guaranteed stable, pointers to nodes are not.
 The size of the table is the count of non-zero id entries.
 
 -- Successor cache --
-A secondary cache maps (from,j) -> to, where from and to are node_ids, 
+A secondary cache maps (from,j) -> to, where from and to are node_ids,
 and 2^j is the number of generations advanced.
 
 This is a convenience cache which just accelerates calls to successor().
-Generally, this cache is much sparser than the node table, 
-and so we just layer "underneath" the main table. 
+Generally, this cache is much sparser than the node table,
+and so we just layer "underneath" the main table.
 
 This does not even probe; it either matches on the first hash, or we
 recompute the successor.
@@ -50,27 +59,27 @@ without affecting correctness; it will automatically be recomputed as needed.
 typedef struct node
 {
     node_id id;
-    uint64_t level;
-    node_id a, b, c, d;  // children    
-    uint64_t pop;     
+    node_id a, b, c, d; // children
+    uint64_t pop;
     // piggy back cache
     // same size as the table, but keyed on (from,j)
     node_id from;
     node_id to;
-    uint64_t j;    
+    uint64_t j;       
 } node;
-
 
 typedef struct node_table
 {
-    node *index;          
+    node_id on, off;
+    node *index;    
     uint64_t size;  // number of slots (always a power of 2)
-    uint64_t count; // number of allocated slots            
+    uint64_t count; // number of allocated slots
 } node_table;
 
 /* Hash functions */
 uint64_t mix64(uint64_t x);
-uint64_t hash_quad(const uint64_t a, const uint64_t b, const uint64_t c, const uint64_t d);
+uint64_t hash_quad(uint64_t a, uint64_t b, uint64_t c, uint64_t d);
+uint64_t merge(node_id a, node_id b, node_id c, node_id d);
 
 /* Table operations */
 void vacuum(node_table *table, node_id top);
@@ -80,7 +89,7 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
 
 /* Initalisation */
 node_table *create_table(uint64_t initial_size);
-node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i);
+node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i, node_id on, node_id off);
 node_id life_4x4(node_table *table, node_id m_h);
 
 /* Node operations */
