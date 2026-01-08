@@ -370,7 +370,7 @@ void vacuum(node_table *table, node_id top)
         */
         if (n->to != UNUSED)
         {
-            if (lookup(table, n->to)->id != n->to)
+            if (lookup(table, n->to)->id != n->to || lookup(table, n->from)->id != n->from)
             {
                 // invalid node, delete it
                 n->from = UNUSED;

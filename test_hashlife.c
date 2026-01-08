@@ -69,13 +69,12 @@ uint64_t verify_tree(node_table *table, node_id id, uint64_t level)
 {
     assert(id != UNUSED);
     node *n = lookup(table, id);    
+    assert(n != NULL);
     assert(id == n->id);
     assert(n->pop <= (1ULL << (2 * LEVEL(id))));
     assert(LEVEL(id) == level);
     assert(IS_ZERO(id) == (n->pop==0)); // zero nodes must have IS_ZERO set
     assert(!IS_MARKED(id));
-
-    assert(n != NULL);
     if (LEVEL(id) == 0)
     {
         assert(id == table->on || id == table->off);
@@ -102,7 +101,6 @@ void verify_whole_tree(node_table *table)
         node *n = &table->index[i];
         if (n->id != 0 && LEVEL(n->id) <= 8)
         {
-
             verify_tree(table, n->id, LEVEL(n->id));
         }
     }
@@ -471,6 +469,8 @@ void test_vacuum()
     free(buf);
     printf("Vacuum did not remove damage the pattern\n");
     verify_tree(table, pattern, LEVEL(pattern));
+    verify_whole_tree(table);
+    verify_hashtable(table);
     
     /* generate junk via advance */
     for (int i = 0; i < 100; i++)
@@ -481,6 +481,8 @@ void test_vacuum()
     vacuum(table, original_pattern);
     after_count = table->count;
     assert(after_count < before_count);
+    verify_hashtable(table);
+    validate_successor_cache(table);
     printf("Vacuum removed unreachable nodes\n");
 
     TEST_OK("Vacuum function verified");
