@@ -167,7 +167,7 @@ void test_init()
     TEST_OK("Table initialisation verified");
 }
 
-void validate_successor_cache(node_table *table)
+void verify_successor_cache(node_table *table)
 {
     TEST_START("Validating successor cache");
     for (uint64_t i = 0; i < table->size; i++)
@@ -276,7 +276,7 @@ void test_still_life()
     node_id next_1 = advance(table, mickey, 8);
     assert(verify_same(table, next_1, mickey_mouse));
     printf("Still life variable step with advance passed\n");
-    validate_successor_cache(table);
+    verify_successor_cache(table);
     TEST_OK("Still life pattern verified");
 }
 
@@ -336,7 +336,7 @@ void test_gun()
         verify_same(table, small_step, big_text);
         free(big_text);
     }
-    validate_successor_cache(table);
+    verify_successor_cache(table);
     printf("Verified big step advance matches multiple small steps\n");
     print_table_stats(table);
     TEST_OK("Variable pattern verified");
@@ -394,17 +394,23 @@ static node_id timing_pattern;
 int time_next()
 {
     node_id pattern = timing_pattern;
+    node_table *test_table = duplicate_table(timing_table);
     for (int i = 0; i < 128; i++)
-        pattern = successor(timing_table, centre(timing_table, centre(timing_table, pattern)), 0);
-    return lookup(timing_table, pattern)->pop;
+        pattern = successor(test_table, centre(test_table, centre(test_table, pattern)), 0);
+    uint64_t pop = lookup(test_table, pattern)->pop;
+    free_table(test_table);
+    return pop;
 }
 
 int time_advance_1()
 {
     node_id pattern = timing_pattern;
 
-    pattern = advance(timing_table, pattern, 1);
-    return lookup(timing_table, pattern)->pop;
+    node_table *test_table = duplicate_table(timing_table);
+    pattern = advance(test_table, pattern, 1);    
+    uint64_t pop = lookup(test_table, pattern)->pop;
+    free_table(test_table);
+    return pop;
 }
 
 int time_advance_64()
@@ -425,19 +431,22 @@ int time_advance_256()
 
 int time_advance_65535()
 {
-    node_id pattern = timing_pattern;
-    pattern = advance(timing_table, pattern, 65535);
+    node_id pattern = timing_pattern;    
+    node_table *test_table = duplicate_table(timing_table);
+    pattern = advance(test_table, pattern, 65535);
     // report the total number of entries where from is non-zero
     uint64_t count = 0;
-    for (uint64_t i = 0; i < timing_table->size; i++)
+    for (uint64_t i = 0; i < test_table->size; i++)
     {
-        node *n = &timing_table->index[i];
+        node *n = &test_table->index[i];
         if (n->from != 0)
             count++;
     }
-    printf("Cache load factor: %f%%\n", (count * 100.0) / timing_table->size);
+    printf("Cache load factor: %f%%\n", (count * 100.0) / test_table->size);
 
-    return lookup(timing_table, pattern)->pop;
+    uint64_t pop =  lookup(test_table, pattern)->pop;
+    free_table(test_table);
+    return pop;
 }
 
 int time_advance_65536()
@@ -482,7 +491,7 @@ void test_vacuum()
     after_count = table->count;
     assert(after_count < before_count);
     verify_hashtable(table);
-    validate_successor_cache(table);
+    verify_successor_cache(table);
     printf("Vacuum removed unreachable nodes\n");
 
     TEST_OK("Vacuum function verified");
@@ -520,6 +529,8 @@ void test_ffwd()
     uint64_t generations = 0;
     node_id future = ffwd(table, breeder, 48, &generations);
     printf("Fast forwarded breeder by %llu generations, population %llu\n", generations, lookup(table, future)->pop);
+    verify_successor_cache(table);
+    verify_hashtable(table);    
     TEST_OK("Fast forward function verified");
 }
 

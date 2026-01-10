@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <string.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define INIT_TABLE_SIZE 4096
@@ -16,9 +17,8 @@ typedef uint64_t node_id;
 static const node_id UNUSED = 0;
 
 /* Define macros for setting, clearing, and testing the MSB of pop */
-#define SET_MSB(x) ((x) | (1ULL << 63))
-#define CLEAR_MSB(x) ((x) & ~(1ULL << 63))
-#define TEST_MSB(x) (((x) >> 63) & 1)
+#define MARK(x) ((x) | (1ULL << 63))
+#define UNMARK(x) ((x) & ~(1ULL << 63))
 
 
 #define LEVEL(node) (((node) >> 46) & 0xFFFFULL)
@@ -87,8 +87,13 @@ node_id get_zero(node_table *table, uint64_t k);
 node *lookup(node_table *table, node_id hash);
 node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, node_id d_hash);
 
-/* Initalisation */
+/* Initalisation, copy and free */
 node_table *create_table(uint64_t initial_size);
+node_table *duplicate_table(node_table *old_table);
+void free_table(node_table *table);
+
+
+
 node_id base_life(node_id a, node_id b, node_id c, node_id d, node_id e, node_id f, node_id g, node_id h, node_id i, node_id on, node_id off);
 node_id life_4x4(node_table *table, node_id m_h);
 

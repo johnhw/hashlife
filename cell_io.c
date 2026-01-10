@@ -177,6 +177,7 @@ node_id from_rle(node_table *table, char *rle_str)
     return root;
 }
 
+
 /*
     Take a hashlife node and output an RLE string into the given buffer.
     The buffer must be large enough to hold the output.

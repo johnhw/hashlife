@@ -95,6 +95,16 @@ node *lookup(node_table *table, node_id id)
     return n;
 }
 
+
+/* Duplicate a table */
+node_table *duplicate_table(node_table *old_table)
+{
+    node_table *new_table = create_table(old_table->size);
+    memcpy(new_table->index, old_table->index, old_table->size * sizeof(node));
+    new_table->count = old_table->count;    
+    return new_table;
+}
+
 /* Double the size of the table, reinserting nodes */
 void resize_table(node_table *table)
 {
@@ -332,7 +342,7 @@ void set_flag(node_table *table, node_id id)
     node *n = lookup(table, id);
 
     // set the high bit of pop
-    n->pop = SET_MSB(n->pop);
+    n->id = MARK(n->id);
 
     set_flag(table, n->a);
     set_flag(table, n->b);
@@ -351,10 +361,11 @@ void vacuum(node_table *table, node_id top)
     for (uint64_t i = 0; i < table->size; i++)
     {
         node *n = &old_index[i];                
-        if (n->id != UNUSED && (LEVEL(n->id) <= 2 || TEST_MSB(n->pop)))
+        bool marked = IS_MARKED(n->id);
+        n->id = UNMARK(n->id);
+        if (n->id != UNUSED && (LEVEL(n->id) <= 2 || marked))
         {            
-            node *slot = lookup(table, n->id);
-            n->pop = CLEAR_MSB(n->pop);
+            node *slot = lookup(table, n->id);            
             assert(slot->id == UNUSED); // should not already exist
             *slot = *n;            
             table->count++;
@@ -396,6 +407,12 @@ node_table *create_table(uint64_t initial_size)
     table->count = 2;
     return table;
 }
+
+void free_table(node_table *table)
+{
+    free(table->index);
+    free(table);
+}   
 
 /* Return the inner node of half the size in each dimension */
 node_id inner(node_table *table, node_id id)
