@@ -11,7 +11,7 @@ from hashlife import construct, advance, expand
 from lifeparsers import autoguess_life_file
 from render import render_img
 
-pat, _ = autoguess_life_file("lifep/gun30.lif") 
+pat, _ = autoguess_life_file("lifep/GUN30.lif") 
 node = construct(pat) # create quadtree
 node_30 = advance(node, 30) # forward 30 generations
 pts = expand(node_30) # convert to point list
