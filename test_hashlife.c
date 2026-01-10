@@ -394,7 +394,7 @@ static node_id timing_pattern;
 int time_next()
 {
     node_id pattern = timing_pattern;
-    node_table *test_table = duplicate_table(timing_table);
+    node_table *test_table = copy_table(timing_table);
     for (int i = 0; i < 128; i++)
         pattern = successor(test_table, centre(test_table, centre(test_table, pattern)), 0);
     uint64_t pop = lookup(test_table, pattern)->pop;
@@ -406,7 +406,7 @@ int time_advance_1()
 {
     node_id pattern = timing_pattern;
 
-    node_table *test_table = duplicate_table(timing_table);
+    node_table *test_table = copy_table(timing_table);
     pattern = advance(test_table, pattern, 1);    
     uint64_t pop = lookup(test_table, pattern)->pop;
     free_table(test_table);
@@ -432,7 +432,7 @@ int time_advance_256()
 int time_advance_65535()
 {
     node_id pattern = timing_pattern;    
-    node_table *test_table = duplicate_table(timing_table);
+    node_table *test_table = copy_table(timing_table);
     pattern = advance(test_table, pattern, 65535);
     // report the total number of entries where from is non-zero
     uint64_t count = 0;

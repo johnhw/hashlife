@@ -89,7 +89,7 @@ node_id join(node_table *table, node_id a_hash, node_id b_hash, node_id c_hash, 
 
 /* Initalisation, copy and free */
 node_table *create_table(uint64_t initial_size);
-node_table *duplicate_table(node_table *old_table);
+node_table *copy_table(node_table *old_table);
 void free_table(node_table *table);
 
 

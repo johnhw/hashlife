@@ -97,7 +97,7 @@ node *lookup(node_table *table, node_id id)
 
 
 /* Duplicate a table */
-node_table *duplicate_table(node_table *old_table)
+node_table *copy_table(node_table *old_table)
 {
     node_table *new_table = create_table(old_table->size);
     memcpy(new_table->index, old_table->index, old_table->size * sizeof(node));
