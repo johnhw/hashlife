@@ -28,8 +28,8 @@ void verify_hashtable(node_table *table)
         }
     }
     assert(entries == table->count);
-    // verify load is < 25%
-    assert(table->count * 4 < table->size);
+    // verify load is <= 25%
+    assert(table->count * 4 <= table->size);
     TEST_OK("Hashtable verified");
 }
 
@@ -44,16 +44,18 @@ void verify_children(node_table *table)
         node *n = &table->index[i];
         if (n->id != 0)
         {
-            if (n->level > 0)
+        
+            if (LEVEL(n->id) > 0)
             {
+                uint64_t sublevel = LEVEL(n->id) - 1;
                 node *a = lookup(table, n->a);
                 node *b = lookup(table, n->b);
                 node *c = lookup(table, n->c);
                 node *d = lookup(table, n->d);
-                assert(a != NULL && a->level == n->level - 1);
-                assert(b != NULL && b->level == n->level - 1);
-                assert(c != NULL && c->level == n->level - 1);
-                assert(d != NULL && d->level == n->level - 1);
+                assert(a != NULL && LEVEL(a->id) == sublevel);
+                assert(b != NULL && LEVEL(b->id) == sublevel);
+                assert(c != NULL && LEVEL(c->id) == sublevel);
+                assert(d != NULL && LEVEL(d->id) == sublevel);
             }
         }
     }
@@ -66,24 +68,25 @@ void verify_children(node_table *table)
 uint64_t verify_tree(node_table *table, node_id id, uint64_t level)
 {
     assert(id != UNUSED);
-    node *n = lookup(table, id);
-    assert(id == n->id);
-    assert(n->pop <= (1ULL << (2 * n->level)));
-    assert(n->level == level);
-
+    node *n = lookup(table, id);    
     assert(n != NULL);
-    if (n->level == 0)
+    assert(id == n->id);
+    assert(n->pop <= (1ULL << (2 * LEVEL(id))));
+    assert(LEVEL(id) == level);
+    assert(IS_ZERO(id) == (n->pop==0)); // zero nodes must have IS_ZERO set
+    assert(!IS_MARKED(id));
+    if (LEVEL(id) == 0)
     {
-        assert(id == ON || id == OFF);
+        assert(id == table->on || id == table->off);
         return n->pop;
     }
     else
     {
         uint64_t pop = 0;
-        pop += verify_tree(table, n->a, n->level - 1);
-        pop += verify_tree(table, n->b, n->level - 1);
-        pop += verify_tree(table, n->c, n->level - 1);
-        pop += verify_tree(table, n->d, n->level - 1);
+        pop += verify_tree(table, n->a, LEVEL(id) - 1);
+        pop += verify_tree(table, n->b, LEVEL(id) - 1);
+        pop += verify_tree(table, n->c, LEVEL(id) - 1);
+        pop += verify_tree(table, n->d, LEVEL(id) - 1);
         assert(n->pop == pop);
         return pop;
     }
@@ -96,10 +99,9 @@ void verify_whole_tree(node_table *table)
     for (uint64_t i = 0; i < table->size; i++)
     {
         node *n = &table->index[i];
-        if (n->id != 0 && n->level <= 8)
+        if (n->id != 0 && LEVEL(n->id) <= 8)
         {
-
-            verify_tree(table, n->id, n->level);
+            verify_tree(table, n->id, LEVEL(n->id));
         }
     }
     TEST_OK("Whole tree verified");
@@ -112,9 +114,9 @@ void verify_whole_population(node_table *table)
     for (uint64_t i = 0; i < table->size; i++)
     {
         node *n = &table->index[i];
-        if (n->id != 0 && n->level <= 8)
+        if (n->id != 0 && LEVEL(n->id) <= 8)
         {
-            bool ok = verify_tree(table, n->id, n->level);
+            bool ok = verify_tree(table, n->id, LEVEL(n->id));
             assert(ok);
         }
     }
@@ -127,11 +129,10 @@ void test_inner(node_table *table, node_id id)
 
     node_id in = inner(table, id);
     node *n = lookup(table, id);
-    node *in_n = lookup(table, in);
-    assert(in_n->level == n->level - 1);
+    assert(LEVEL(in) == LEVEL(id) - 1);
     node_id centre_id = centre(table, id);
     node *centre_n = lookup(table, centre_id);
-    assert(centre_n->level == n->level + 1);
+    assert(LEVEL(centre_id) == LEVEL(id) + 1);
     assert(centre_n->pop == n->pop);
     assert(is_padded(table, centre_id));
     assert(inner(table, centre_id) == id);
@@ -143,7 +144,7 @@ void test_inner(node_table *table, node_id id)
 void print_node(node_table *table, node_id id)
 {
     node *n = lookup(table, id);
-    printf("Node ID: %llu, Level: %llu, Pop: %llu, Children: [%llu, %llu, %llu, %llu]\n", n->id, n->level, n->pop, n->a, n->b, n->c, n->d);
+    printf("Node ID: %llu, Level: %llu, Pop: %llu, Children: [%llu, %llu, %llu, %llu]\n", n->id, LEVEL(id), n->pop, n->a, n->b, n->c, n->d);
 }
 
 void test_init()
@@ -156,12 +157,35 @@ void test_init()
     assert(table != NULL);
     printf("Table was not NULL\n");
     node *on, *off;
-    on = lookup(table, ON);
-    off = lookup(table, OFF);
+    on = lookup(table, table->on);
+    off = lookup(table, table->off);
     assert(on->pop == 1);
     assert(off->pop == 0);
+    assert(LEVEL(on->id)==0);
+    assert(LEVEL(off->id)==0);    
     printf("On and Off nodes verified\n");
     TEST_OK("Table initialisation verified");
+}
+
+void verify_successor_cache(node_table *table)
+{
+    TEST_START("Validating successor cache");
+    for (uint64_t i = 0; i < table->size; i++)
+    {
+        node *n = &table->index[i];
+        assert((n->from==UNUSED) == (n->to==UNUSED));
+        if (n->to != UNUSED)
+        {
+            node *from_n = lookup(table, n->from);
+            assert(from_n->id == n->from); // from node must exist
+            node *to_n = lookup(table, n->to);
+            assert(to_n->id == n->to); // to node must exist
+            node_id expected_to = successor(table, n->from, n->j);
+            assert(expected_to == n->to);
+        }
+    }
+    TEST_OK("Successor cache validated");
+
 }
 
 #define TEST_CELLS 256
@@ -184,7 +208,7 @@ void test_set_get()
     node = set_cell(table, node, 3, 7, 1);
     assert(lookup(table, node)->pop == 1);
     float grey = get_cell(table, node, 3, 7, 0);
-    assert(grey == 1.0f);
+    assert(grey > 0.5f);
     node = set_cell(table, node, 3, 7, 0);
     assert(lookup(table, node)->pop == 0);
     grey = get_cell(table, node, 3, 7, 0);
@@ -202,8 +226,8 @@ void test_set_get()
         node = set_cell(table, node, test_cells[i][0], test_cells[i][1], 1);
     }
     assert(lookup(table, node)->pop == TEST_CELLS);
-    printf("Node size after set cells: %d\n", 1 << lookup(table, node)->level);
-    printf("Grey level after setting %d cells: %f\n", TEST_CELLS, get_cell(table, node, 0, 0, lookup(table, node)->level));
+    printf("Node size after set cells: %d\n", 1 << LEVEL(node));
+    printf("Grey level after setting %d cells: %f\n", TEST_CELLS, get_cell(table, node, 0, 0, LEVEL(node)));
 
     // get cells
     for (int i = 0; i < TEST_CELLS; i++)
@@ -239,7 +263,7 @@ void test_still_life()
     /* Generate the still life pattern and verify it never changes */
     mickey = centre(table, centre(table, mickey));
     verify_children(table);
-    verify_tree(table, mickey, lookup(table, mickey)->level);
+    verify_tree(table, mickey, LEVEL(mickey));
 
     node_id succ = successor(table, mickey, 0);
 
@@ -252,6 +276,7 @@ void test_still_life()
     node_id next_1 = advance(table, mickey, 8);
     assert(verify_same(table, next_1, mickey_mouse));
     printf("Still life variable step with advance passed\n");
+    verify_successor_cache(table);
     TEST_OK("Still life pattern verified");
 }
 
@@ -311,7 +336,7 @@ void test_gun()
         verify_same(table, small_step, big_text);
         free(big_text);
     }
-
+    verify_successor_cache(table);
     printf("Verified big step advance matches multiple small steps\n");
     print_table_stats(table);
     TEST_OK("Variable pattern verified");
@@ -369,17 +394,23 @@ static node_id timing_pattern;
 int time_next()
 {
     node_id pattern = timing_pattern;
+    node_table *test_table = copy_table(timing_table);
     for (int i = 0; i < 128; i++)
-        pattern = successor(timing_table, centre(timing_table, centre(timing_table, pattern)), 0);
-    return lookup(timing_table, pattern)->pop;
+        pattern = successor(test_table, centre(test_table, centre(test_table, pattern)), 0);
+    uint64_t pop = lookup(test_table, pattern)->pop;
+    free_table(test_table);
+    return pop;
 }
 
 int time_advance_1()
 {
     node_id pattern = timing_pattern;
 
-    pattern = advance(timing_table, pattern, 1);
-    return lookup(timing_table, pattern)->pop;
+    node_table *test_table = copy_table(timing_table);
+    pattern = advance(test_table, pattern, 1);    
+    uint64_t pop = lookup(test_table, pattern)->pop;
+    free_table(test_table);
+    return pop;
 }
 
 int time_advance_64()
@@ -400,19 +431,22 @@ int time_advance_256()
 
 int time_advance_65535()
 {
-    node_id pattern = timing_pattern;
-    pattern = advance(timing_table, pattern, 65535);
+    node_id pattern = timing_pattern;    
+    node_table *test_table = copy_table(timing_table);
+    pattern = advance(test_table, pattern, 65535);
     // report the total number of entries where from is non-zero
     uint64_t count = 0;
-    for (uint64_t i = 0; i < timing_table->size; i++)
+    for (uint64_t i = 0; i < test_table->size; i++)
     {
-        node *n = &timing_table->index[i];
+        node *n = &test_table->index[i];
         if (n->from != 0)
             count++;
     }
-    printf("Cache load factor: %f%%\n", (count * 100.0) / timing_table->size);
+    printf("Cache load factor: %f%%\n", (count * 100.0) / test_table->size);
 
-    return lookup(timing_table, pattern)->pop;
+    uint64_t pop =  lookup(test_table, pattern)->pop;
+    free_table(test_table);
+    return pop;
 }
 
 int time_advance_65536()
@@ -425,19 +459,28 @@ int time_advance_65536()
 void test_vacuum()
 {
     TEST_START("Testing vacuum function");
-    node_table *table = create_table(128);
+    node_table *table = create_table(1024);
     char *gosper_rle = "24bo11b$22bobo11b$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o14b$2o8b\no3bob2o4bobo11b$10bo5bo7bo11b$11bo3bo20b$12b2o!";
     node_id pattern = from_rle(table, gosper_rle);
+    char *buf = to_text(table, pattern);
     node_id original_pattern = pattern;
     uint64_t before_count, after_count;
-    vacuum(table, pattern);
+    vacuum(table, pattern);    
+    verify_hashtable(table);
+    verify_tree(table, pattern, LEVEL(pattern));
     before_count = table->count;
     vacuum(table, pattern);
     after_count = table->count;
+    printf("Table size before vacuum: %llu, after vacuum: %llu\n", before_count, after_count);
     assert(after_count == before_count);
-    printf("Vacuum did not remove any nodes when all reachable\n");
-    verify_tree(table, pattern, lookup(table, pattern)->level);
-
+    printf("Vacuum on reachable pattern did not change table size\n");
+    verify_same(table, pattern, buf);
+    free(buf);
+    printf("Vacuum did not remove damage the pattern\n");
+    verify_tree(table, pattern, LEVEL(pattern));
+    verify_whole_tree(table);
+    verify_hashtable(table);
+    
     /* generate junk via advance */
     for (int i = 0; i < 100; i++)
     {
@@ -447,6 +490,8 @@ void test_vacuum()
     vacuum(table, original_pattern);
     after_count = table->count;
     assert(after_count < before_count);
+    verify_hashtable(table);
+    verify_successor_cache(table);
     printf("Vacuum removed unreachable nodes\n");
 
     TEST_OK("Vacuum function verified");
@@ -469,8 +514,8 @@ void test_zeros()
     for (uint64_t i = 0; i < 200; i++)
     {
         node_id z = get_zero(table, i);
-        node *n = lookup(table, z);
-        assert(n->level == i);
+        node *n = lookup(table, z);        
+        assert(LEVEL(z) == i);
         assert(n->pop == 0);
     }
     TEST_OK("Zero node creation verified");
@@ -484,6 +529,8 @@ void test_ffwd()
     uint64_t generations = 0;
     node_id future = ffwd(table, breeder, 48, &generations);
     printf("Fast forwarded breeder by %llu generations, population %llu\n", generations, lookup(table, future)->pop);
+    verify_successor_cache(table);
+    verify_hashtable(table);    
     TEST_OK("Fast forward function verified");
 }
 

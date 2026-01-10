@@ -34,7 +34,7 @@ node_id from_text(node_table *table, char *txt)
 */
 char *to_text(node_table *table, node_id id)
 {
-    uint64_t size = 1ULL << lookup(table, id)->level;
+    uint64_t size = 1ULL << LEVEL(id);
     char *p = malloc(size * (size + 1) + 1); // include newlines and null terminator
     char *start = p;
     for (uint64_t y = 0; y < size; y++)
@@ -177,6 +177,7 @@ node_id from_rle(node_table *table, char *rle_str)
     return root;
 }
 
+
 /*
     Take a hashlife node and output an RLE string into the given buffer.
     The buffer must be large enough to hold the output.
@@ -186,7 +187,7 @@ char *to_rle(node_table *table, node_id id)
     int bufsize = 4096;
     char *buf = malloc(bufsize);
     char *p = buf;
-    uint64_t size = 1ULL << lookup(table, id)->level;
+    uint64_t size = 1ULL << LEVEL(id);
     uint64_t count;
     p += sprintf(p, "x=%llu,y=%llu, rule = B3/S23\n", size, size);
 
